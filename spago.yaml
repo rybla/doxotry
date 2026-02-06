@@ -1,0 +1,13 @@
+package:
+  name: doxotry
+  dependencies:
+    - console
+    - effect
+    - prelude
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 72.1.0
+  extraPackages: {}
