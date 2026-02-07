@@ -33,13 +33,16 @@ checkTm
   => Ty
   -> Tm an
   -> m (CheckedTm an)
+-- LitTm
 checkTm ty@(BaseTy { base: StringTyBase }) (LitTm tl@({ lit: StringTmLit _ }) an) = pure $ LitTm tl (ty /\ an)
 checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an) = pure $ LitTm tl (ty /\ an)
+-- VarTm
 checkTm ty tm0@(VarTm tm an) = do
   ty' <- getTypeOfTmVar tm.var
   unless (ty == ty') do
     throwError $ TypeError { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
   pure $ VarTm { var: tm.var } (ty /\ an)
+-- AppTm
 checkTm ty (AppTm tm an) = do
   apl <- case tm.apl of
     FunTm apl _ -> pure apl
@@ -54,6 +57,7 @@ checkTm ty (AppTm tm an) = do
     , arg: arg'
     }
     (ty /\ an)
+-- FunTm
 checkTm ty tm0@(FunTm tm an) = do
   funTy <- case ty of
     FunTy funTy -> pure funTy
@@ -67,6 +71,13 @@ checkTm ty tm0@(FunTm tm an) = do
     FunTm
       { prm: tm.prm, dom: tm.dom, body: body' }
       (ty /\ an)
+-- InputTm
+checkTm ty (InputTm tm an) = do
+  pure $
+    InputTm
+      { prompt: tm.prompt }
+      (ty /\ an)
+-- type error
 checkTm ty tm = throwError $ TypeError { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
 
 extendTyCtx :: forall m a. MonadReader Ctx m => TmVar -> Ty -> m a -> m a

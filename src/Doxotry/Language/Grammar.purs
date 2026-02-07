@@ -46,6 +46,7 @@ data Tm an
   | AppTm (AppTm an) an
   | FunTm (FunTm an) an
   | CloTm (CloTm an) an
+  | InputTm InputTm an
 
 derive instance Generic (Tm an) _
 
@@ -63,6 +64,8 @@ type AppTm an = { apl :: Tm an, arg :: Tm an }
 type FunTm an = { prm :: TmVar, dom :: Ty, body :: Tm an }
 
 type CloTm an = { env :: ExeEnv an, body :: Tm an }
+
+type InputTm = { prompt :: String }
 
 --------------------------------------------------------------------------------
 
