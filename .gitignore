@@ -39,4 +39,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .purs-repl
 .spago
 output
-purescript_dist
+client_purescript_dist
