@@ -21,7 +21,7 @@ serve: setup test
     bun spago run -m Server.Main
 
 bundle_client: setup
-    bun spago bundle --platform browser --source-maps --minify --module Client.Main --outfile=client_purescript_dist/main.js
+    bun spago bundle --platform browser --source-maps --minify --module Doxotry.Client.Main --outfile=client_purescript_dist/main.js
     bun run script/bundle_client.ts
 
 build: test bundle_client

@@ -4,6 +4,7 @@ package:
     - console
     - effect
     - prelude
+    - halogen
   test:
     main: Test.Main
     dependencies: []

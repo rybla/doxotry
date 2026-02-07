@@ -1,4 +1,4 @@
-module Client.Main where
+module Doxotry.Server.Main where
 
 import Prelude
 
@@ -6,5 +6,5 @@ import Effect (Effect)
 import Effect.Class.Console as Console
 
 main :: Effect Unit
-main = Console.log "Client.Main.main"
+main = Console.log "Server.Main.main"
 
