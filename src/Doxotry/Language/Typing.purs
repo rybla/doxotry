@@ -2,14 +2,18 @@ module Doxotry.Language.Typing where
 
 import Prelude
 
+import Doxotry.Language.Grammar
+
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader, ask, local)
 import Data.List as List
 import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
-import Data.Tuple.Nested (type (/\), (/\))
-import Doxotry.Language.Grammar (Tm(..), TmLit(..), TmVar, Ty(..), TyBase(..), TyCtx(..))
+import Data.Tuple.Nested ((/\))
+import Prim.Row (class Lacks)
+import Record as Record
+import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
 
@@ -23,25 +27,27 @@ newtype TypeError = TypeError
 
 --------------------------------------------------------------------------------
 
-type CheckedTm an = Tm (Ty /\ an)
+type TypedTm an = Tm (TypedAn an)
+type TypedAn an = (ty :: Ty | an)
 
 checkTm
   :: forall m an
    . MonadReader Ctx m
   => MonadThrow TypeError m
-  => Show an
+  => Lacks "ty" an
+  => Show (Record an)
   => Ty
   -> Tm an
-  -> m (CheckedTm an)
+  -> m (TypedTm an)
 -- LitTm
-checkTm ty@(BaseTy { base: StringTyBase }) (LitTm tl@({ lit: StringTmLit _ }) an) = pure $ LitTm tl (ty /\ an)
-checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an) = pure $ LitTm tl (ty /\ an)
+checkTm ty@(BaseTy { base: StringTyBase }) (LitTm tl@({ lit: StringTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
+checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 -- VarTm
 checkTm ty tm0@(VarTm tm an) = do
   ty' <- getTypeOfTmVar tm.var
   unless (ty == ty') do
     throwError $ TypeError { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
-  pure $ VarTm { var: tm.var } (ty /\ an)
+  pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 checkTm ty (AppTm tm an) = do
   apl <- case tm.apl of
@@ -53,10 +59,11 @@ checkTm ty (AppTm tm an) = do
     { apl:
         FunTm
           { prm: apl.prm, dom: apl.dom, body: body' }
-          (FunTy { prm: apl.prm, dom: apl.dom, cod: ty } /\ an)
+          (Record.insert (Proxy @"ty") (FunTy { prm: apl.prm, dom: apl.dom, cod: ty }) an)
     , arg: arg'
     }
-    (ty /\ an)
+    (Record.insert (Proxy @"ty") ty an)
+
 -- FunTm
 checkTm ty tm0@(FunTm tm an) = do
   funTy <- case ty of
@@ -70,13 +77,13 @@ checkTm ty tm0@(FunTm tm an) = do
   pure $
     FunTm
       { prm: tm.prm, dom: tm.dom, body: body' }
-      (ty /\ an)
+      (Record.insert (Proxy @"ty") ty an)
 -- InputTm
 checkTm ty (InputTm tm an) = do
   pure $
     InputTm
       { prompt: tm.prompt }
-      (ty /\ an)
+      (Record.insert (Proxy @"ty") ty an)
 -- type error
 checkTm ty tm = throwError $ TypeError { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
 
