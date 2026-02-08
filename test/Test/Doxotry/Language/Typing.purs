@@ -1,13 +1,12 @@
 module Test.Doxotry.Language.Typing where
 
-import Doxotry.Language.Grammar
-import Doxotry.Language.Typing
 import Prelude
 
+import Doxotry.Language.Grammar (Tm_, Ty, mkAppTm, mkFunTm, mkFunTy, mkNumberTm, mkNumberTy, mkStringTm, mkStringTy, mkVar, mkVarTm, prettyTm, prettyTy)
+import Doxotry.Language.Typing (checkTm, mkCtx)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Writer (runWriterT)
-import Data.Bifunctor (lmap, rmap)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
 import Data.Identity (Identity)
@@ -42,6 +41,18 @@ spec = describe "Typing" do
     it_checks true
       mkStringTy
       (mkAppTm (mkFunTm (mkVar "x") mkStringTy (mkVarTm "x")) (mkStringTm "hello world"))
+    it_checks false
+      mkStringTy
+      ( mkAppTm
+          ( mkAppTm
+              ( mkFunTm (mkVar "x") mkStringTy
+                  $ mkFunTm (mkVar "y") mkStringTy
+                  $ mkVarTm "x"
+              ) $
+              (mkStringTm "hello")
+          )
+          (mkStringTm "world")
+      )
 
 it_checks
   :: forall an
