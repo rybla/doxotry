@@ -2,11 +2,12 @@ module Test.Main where
 
 import Prelude
 
+import Test.Doxotry as Test.Doxotry
+
 import Effect (Effect)
-import Effect.Class.Console (log)
+import Test.Spec.Reporter.Console (consoleReporter)
+import Test.Spec.Runner.Node (runSpecAndExitProcess)
 
 main :: Effect Unit
-main = do
-  log "🍕"
-  log "You should add some tests."
-
+main = runSpecAndExitProcess [ consoleReporter ] do
+  Test.Doxotry.spec

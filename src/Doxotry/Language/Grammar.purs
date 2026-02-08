@@ -39,6 +39,15 @@ instance Show TyBase where
 
 derive instance Eq TyBase
 
+mkStringTy :: Ty
+mkStringTy = BaseTy { base: StringTyBase }
+
+mkNumberTy :: Ty
+mkNumberTy = BaseTy { base: NumberTyBase }
+
+mkFunTy :: TmVar -> Ty -> Ty -> Ty
+mkFunTy prm dom cod = FunTy { prm, dom, cod }
+
 --------------------------------------------------------------------------------
 
 type Tm an = Tm_ (Record an)
@@ -75,6 +84,35 @@ type CloTm an = CloTm_ (Record an)
 type CloTm_ an = { env :: ExeEnv_ an, body :: Tm_ an }
 
 type InputTm = { prompt :: String }
+
+data TmLit
+  = NumberTmLit Number
+  | StringTmLit String
+
+derive instance Eq TmLit
+
+derive instance Generic TmLit _
+
+instance Show TmLit where
+  show x = genericShow x
+
+mkNumberLitTm :: Number -> Tm ()
+mkNumberLitTm v = LitTm { lit: NumberTmLit v } {}
+
+mkStringLitTm :: String -> Tm ()
+mkStringLitTm v = LitTm { lit: StringTmLit v } {}
+
+mkVarTm :: TmVar -> Tm ()
+mkVarTm var = VarTm { var } {}
+
+mkAppTm :: Tm () -> Tm () -> Tm ()
+mkAppTm apl arg = AppTm { apl, arg } {}
+
+mkFunTm :: TmVar -> Ty -> Tm () -> Tm ()
+mkFunTm prm dom body = FunTm { prm, dom, body } {}
+
+mkInputTm :: String -> Tm ()
+mkInputTm prompt = InputTm { prompt } {}
 
 getAnOfTm :: forall an. Tm_ an -> an
 getAnOfTm (LitTm _ an) = an
@@ -148,17 +186,4 @@ newtype TyVar = TyVar String
 derive newtype instance Show TyVar
 
 derive newtype instance Eq TyVar
-
---------------------------------------------------------------------------------
-
-data TmLit
-  = NumberTmLit Number
-  | StringTmLit String
-
-derive instance Eq TmLit
-
-derive instance Generic TmLit _
-
-instance Show TmLit where
-  show x = genericShow x
 

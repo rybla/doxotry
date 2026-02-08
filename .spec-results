@@ -1,0 +1,16 @@
+[
+  [
+    "Doxotry Language Typing check (LitTm { lit: (StringTmLit \"hello world\") } {}) :: (BaseTy { base: StringTyBase })",
+    {
+      "timestamp": "1770573477305.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing ex1",
+    {
+      "timestamp": "1770573294151.0",
+      "success": true
+    }
+  ]
+]

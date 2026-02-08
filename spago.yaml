@@ -3,9 +3,11 @@ package:
   dependencies:
     - console
     - effect
-    - prelude
     - halogen
+    - prelude
     - record
+    - spec
+    - spec-node
   test:
     main: Test.Main
     dependencies: []

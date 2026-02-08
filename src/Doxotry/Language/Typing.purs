@@ -2,8 +2,6 @@ module Doxotry.Language.Typing where
 
 import Prelude
 
-import Doxotry.Language.Grammar (Tm, TmLit(..), TmVar, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
-
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader, ask, local)
@@ -11,6 +9,8 @@ import Data.List as List
 import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
 import Data.Tuple.Nested ((/\))
+import Data.Unfoldable (none)
+import Doxotry.Language.Grammar (Tm, TmLit(..), TmVar, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -19,11 +19,24 @@ import Type.Proxy (Proxy(..))
 
 type Ctx = { tyCtx :: TyCtx }
 
+mkCtx :: Ctx
+mkCtx =
+  { tyCtx: TyCtx none
+  }
+
 type Env = {}
+
+mkEnv :: Env
+mkEnv =
+  {}
 
 newtype Error = Error
   { message :: String
   }
+
+derive newtype instance Show Error
+
+derive newtype instance Eq Error
 
 --------------------------------------------------------------------------------
 
