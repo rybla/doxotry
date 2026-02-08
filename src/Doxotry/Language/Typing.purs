@@ -59,26 +59,28 @@ checkTm
   -> m (TypedTm an)
 -- LitTm
 checkTm ty@(BaseTy { base: StringTyBase }) tm0@(LitTm tl@({ lit: StringTmLit _ }) an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 checkTm ty@(BaseTy { base: NumberTyBase }) tm0@(LitTm tl@({ lit: NumberTmLit _ }) an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 -- Var
 checkTm ty tm0@(VarTm tm an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   ty' <- getTypeOfVar tm.var
   unless (ty == ty') do
     throwError $ Error { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty' }
   pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 checkTm ty tm0@(AppTm tm an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   apl <- case tm.apl of
     FunTm apl _ -> pure apl
     apl -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm apl }
   arg' <- checkTm apl.dom tm.arg
-  body' <- checkTm ty apl.body
+  body' <-
+    extendTyCtx apl.prm apl.dom do
+      checkTm ty apl.body
   pure $ AppTm
     { apl:
         FunTm
@@ -90,7 +92,7 @@ checkTm ty tm0@(AppTm tm an) = do
 
 -- FunTm
 checkTm ty tm0@(FunTm tm an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   funTy <- case ty of
     FunTy funTy -> pure funTy
     _ -> throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term" }
@@ -105,7 +107,7 @@ checkTm ty tm0@(FunTm tm an) = do
       (Record.insert (Proxy @"ty") ty an)
 -- InputTm
 checkTm ty tm0@(InputTm tm an) = do
-  tellLog "checkTm" $ prettyTm tm0 <> " : " <> prettyTy ty
+  log_checkTm ty tm0
   pure $
     InputTm
       { prompt: tm.prompt }
@@ -114,6 +116,17 @@ checkTm ty tm0@(InputTm tm an) = do
 checkTm ty tm = do
   tellLog "checkTm" $ prettyTm tm <> " : " <> prettyTy ty
   throwError $ Error { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type." }
+
+log_checkTm
+  :: forall m an
+   . MonadReader Ctx m
+  => MonadWriter (Array Log) m
+  => Ty
+  -> Tm_ (Record an)
+  -> m Unit
+log_checkTm ty tm = do
+  ctx <- ask
+  tellLog "checkTm" $ prettyTyCtx ctx.tyCtx <> " |- " <> prettyTm tm <> " : " <> prettyTy ty
 
 extendTyCtx :: forall m a. MonadReader Ctx m => Var -> Ty -> m a -> m a
 extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.Cons (x /\ ty)) }) ma
