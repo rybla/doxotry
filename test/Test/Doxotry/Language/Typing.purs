@@ -1,15 +1,19 @@
 module Test.Doxotry.Language.Typing where
 
-import Prelude
-
 import Doxotry.Language.Grammar
 import Doxotry.Language.Typing
+import Prelude
 
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
+import Control.Monad.Writer (runWriterT)
+import Data.Bifunctor (lmap, rmap)
 import Data.Either (Either(..))
+import Data.Foldable (intercalate)
 import Data.Identity (Identity)
 import Data.Newtype (unwrap)
+import Data.Tuple.Nested ((/\))
+import Doxotry.Language.Common (prettyLog)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail)
@@ -52,8 +56,8 @@ it_checks success ty tm =
     checkTm ty tm
       # flip runReaderT mkCtx
       # runExceptT
+      # runWriterT
       # (unwrap :: Identity _ -> _)
-      # map (getAnOfTm >>> _.ty)
       # case _ of
-          Right _ -> unless success do fail $ "well-typed"
-          Left err -> when success do fail $ show err
+          (Right tm /\ logs) -> unless success do fail $ "well-typed" <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
+          (Left err /\ logs) -> when success do fail $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
