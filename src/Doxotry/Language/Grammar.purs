@@ -3,12 +3,13 @@ module Doxotry.Language.Grammar where
 import Prelude
 
 import Data.Eq.Generic (genericEq)
+import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Tuple.Nested (type (/\))
+import Data.Tuple.Nested (type (/\), (/\))
 
 --------------------------------------------------------------------------------
 
@@ -50,7 +51,7 @@ mkFunTy prm dom cod = FunTy { prm, dom, cod }
 
 prettyTy :: Ty -> String
 prettyTy (BaseTy bt) = showTyBase bt.base
-prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> ") -> " <> prettyTy ty.cod
+prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> " -> " <> prettyTy ty.cod <> ")"
 
 showTyBase :: TyBase -> String
 showTyBase NumberTyBase = "Number"
@@ -107,21 +108,21 @@ prettyTm :: forall an. Tm an -> String
 prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
-prettyTm (FunTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " -> " <> prettyTm tm.body <> ")"
+prettyTm (FunTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
 prettyTm (InputTm tm _) = "(#input " <> show tm.prompt <> ")"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
 prettyLit (StringTmLit v) = show v
 
-mkNumberLitTm :: Number -> Tm ()
-mkNumberLitTm v = LitTm { lit: NumberTmLit v } {}
+mkNumberTm :: Number -> Tm ()
+mkNumberTm v = LitTm { lit: NumberTmLit v } {}
 
-mkStringLitTm :: String -> Tm ()
-mkStringLitTm v = LitTm { lit: StringTmLit v } {}
+mkStringTm :: String -> Tm ()
+mkStringTm v = LitTm { lit: StringTmLit v } {}
 
-mkVar :: Var -> Tm ()
-mkVar var = VarTm { var } {}
+mkVarTm :: String -> Tm ()
+mkVarTm name = VarTm { var: Var { name, mb_index: Nothing } } {}
 
 mkAppTm :: Tm () -> Tm () -> Tm ()
 mkAppTm apl arg = AppTm { apl, arg } {}
@@ -170,6 +171,9 @@ derive newtype instance Show TyCtx
 
 derive newtype instance Eq TyCtx
 
+prettyTyCtx :: TyCtx -> String
+prettyTyCtx (TyCtx xs) = "{" <> (xs # map (\(x /\ ty) -> prettyVar x <> " : " <> prettyTy ty) # intercalate ", ") <> "}"
+
 --------------------------------------------------------------------------------
 
 type ExeEnv an = ExeEnv_ (Record an)
@@ -194,6 +198,9 @@ derive instance Newtype Var _
 derive newtype instance Show Var
 
 derive newtype instance Eq Var
+
+mkVar :: String -> Var
+mkVar name = Var { name, mb_index: Nothing }
 
 --------------------------------------------------------------------------------
 

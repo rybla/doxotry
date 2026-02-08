@@ -10,7 +10,7 @@ import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
-import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, prettyTm, prettyTy, prettyVar)
+import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, prettyTm, prettyTy, prettyTyCtx, prettyVar)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -117,5 +117,4 @@ getTypeOfVar x = do
             guard $ x == x'
             pure ty
         )
-    # maybe (throwError $ Error { message: "Could not find a variable in context of the name " <> prettyVar x }) pure
-
+    # maybe (throwError $ Error { message: "Unrecognized variable find a variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx }) pure

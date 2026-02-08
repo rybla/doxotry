@@ -28,23 +28,121 @@
     }
   ],
   [
+    "Doxotry Language Typing check no  \"hello world\" : Number",
+    {
+      "timestamp": "1770576360230.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String -> x) : (x : Number) -> String",
+    {
+      "timestamp": "1770576236427.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String -> x) : (x : String) -> Number",
+    {
+      "timestamp": "1770576236427.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String => x) : (x : Number -> String)",
+    {
+      "timestamp": "1770576360230.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String => x) : (x : String -> Number)",
+    {
+      "timestamp": "1770576360230.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String => x) : x : Number -> String",
+    {
+      "timestamp": "1770576276358.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check no  (x : String => x) : x : String -> Number",
+    {
+      "timestamp": "1770576276358.0",
+      "success": true
+    }
+  ],
+  [
     "Doxotry Language Typing check not \"hello world\" : Number",
     {
-      "timestamp": "1770574695420.0",
+      "timestamp": "1770575755697.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check not (x : String -> x) : (x : Number) -> String",
+    {
+      "timestamp": "1770575755697.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check not (x : String -> x) : (x : String) -> Number",
+    {
+      "timestamp": "1770575755697.0",
       "success": true
     }
   ],
   [
     "Doxotry Language Typing check yes \"hello world\" : String",
     {
-      "timestamp": "1770574695420.0",
+      "timestamp": "1770576360230.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes ((x : String -> x) \"hello world\") : String",
+    {
+      "timestamp": "1770576236427.0",
+      "success": false
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes ((x : String => x) \"hello world\") : String",
+    {
+      "timestamp": "1770576360230.0",
+      "success": false
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes (x : String -> x) : (x : String) -> String",
+    {
+      "timestamp": "1770576236427.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes (x : String => x) : (x : String -> String)",
+    {
+      "timestamp": "1770576360230.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes (x : String => x) : x : String -> String",
+    {
+      "timestamp": "1770576276358.0",
       "success": true
     }
   ],
   [
     "Doxotry Language Typing check yes 100.0 : Number",
     {
-      "timestamp": "1770574695420.0",
+      "timestamp": "1770576360230.0",
       "success": true
     }
   ],
