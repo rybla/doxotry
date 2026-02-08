@@ -2,7 +2,7 @@ module Doxotry.Language.Typing where
 
 import Prelude
 
-import Doxotry.Language.Grammar
+import Doxotry.Language.Grammar (Tm, TmLit(..), TmVar, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
 
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
@@ -21,7 +21,7 @@ type Ctx = { tyCtx :: TyCtx }
 
 type Env = {}
 
-newtype TypeError = TypeError
+newtype Error = Error
   { message :: String
   }
 
@@ -30,10 +30,12 @@ newtype TypeError = TypeError
 type TypedTm an = Tm (TypedAn an)
 type TypedAn an = (ty :: Ty | an)
 
+--------------------------------------------------------------------------------
+
 checkTm
   :: forall m an
    . MonadReader Ctx m
-  => MonadThrow TypeError m
+  => MonadThrow Error m
   => Lacks "ty" an
   => Show (Record an)
   => Ty
@@ -46,13 +48,13 @@ checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an
 checkTm ty tm0@(VarTm tm an) = do
   ty' <- getTypeOfTmVar tm.var
   unless (ty == ty') do
-    throwError $ TypeError { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
+    throwError $ Error { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
   pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 checkTm ty (AppTm tm an) = do
   apl <- case tm.apl of
     FunTm apl _ -> pure apl
-    apl -> throwError $ TypeError { message: "the applicant of an application must be a function term, but it actually was " <> show apl }
+    apl -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> show apl }
   arg' <- checkTm apl.dom tm.arg
   body' <- checkTm ty apl.body
   pure $ AppTm
@@ -68,9 +70,9 @@ checkTm ty (AppTm tm an) = do
 checkTm ty tm0@(FunTm tm an) = do
   funTy <- case ty of
     FunTy funTy -> pure funTy
-    _ -> throwError $ TypeError { message: "The term " <> show tm0 <> " was expected to have a non-function type " <> show ty <> ", but it is actually a function term" }
+    _ -> throwError $ Error { message: "The term " <> show tm0 <> " was expected to have a non-function type " <> show ty <> ", but it is actually a function term" }
   unless (funTy.dom == tm.dom) do
-    throwError $ TypeError { message: "The term " <> show tm <> " was expected to be a function term with domain " <> show funTy.dom <> ", but it actually had domain " <> show tm.dom }
+    throwError $ Error { message: "The term " <> show tm <> " was expected to be a function term with domain " <> show funTy.dom <> ", but it actually had domain " <> show tm.dom }
   body' <-
     extendTyCtx tm.prm tm.dom do
       checkTm funTy.cod tm.body
@@ -85,14 +87,14 @@ checkTm ty (InputTm tm an) = do
       { prompt: tm.prompt }
       (Record.insert (Proxy @"ty") ty an)
 -- type error
-checkTm ty tm = throwError $ TypeError { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
+checkTm ty tm = throwError $ Error { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
 
 extendTyCtx :: forall m a. MonadReader Ctx m => TmVar -> Ty -> m a -> m a
 extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.Cons (x /\ ty)) }) ma
 
 --------------------------------------------------------------------------------
 
-getTypeOfTmVar :: forall m. MonadReader Ctx m => MonadThrow TypeError m => TmVar -> m Ty
+getTypeOfTmVar :: forall m. MonadReader Ctx m => MonadThrow Error m => TmVar -> m Ty
 getTypeOfTmVar x = do
   ctx <- ask
   ctx.tyCtx
@@ -102,5 +104,5 @@ getTypeOfTmVar x = do
             guard $ x == x'
             pure ty
         )
-    # maybe (throwError $ TypeError { message: "Could not find a variable in context of the name " <> show x }) pure
+    # maybe (throwError $ Error { message: "Could not find a variable in context of the name " <> show x }) pure
 

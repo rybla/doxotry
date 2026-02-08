@@ -2,8 +2,8 @@ module Doxotry.Language.Execution where
 
 import Prelude
 
-import Doxotry.Language.Grammar
-import Doxotry.Language.Typing
+import Doxotry.Language.Grammar (SemTm, SemTm_(..), TmVar(..), Tm_(..), Ty(..), getAnOfTm)
+import Doxotry.Language.Typing (TypedAn, TypedTm)
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader)
@@ -16,13 +16,15 @@ import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
 
-type TypedSemTm m an = SemTm m (TypedAn an)
-
 type Ctx an = { defaultAn :: Record an }
 
 type Env = { freshVarCounter :: Int }
 
 newtype Err = Err { message :: String }
+
+--------------------------------------------------------------------------------
+
+type TypedSemTm m an = SemTm m (TypedAn an)
 
 --------------------------------------------------------------------------------
 
