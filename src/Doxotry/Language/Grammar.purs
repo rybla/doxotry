@@ -5,7 +5,7 @@ import Prelude
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\))
@@ -18,7 +18,7 @@ data Ty
 
 type BaseTy = { base :: TyBase }
 
-type FunTy = { prm :: TmVar, dom :: Ty, cod :: Ty }
+type FunTy = { prm :: Var, dom :: Ty, cod :: Ty }
 
 derive instance Generic Ty _
 
@@ -45,8 +45,19 @@ mkStringTy = BaseTy { base: StringTyBase }
 mkNumberTy :: Ty
 mkNumberTy = BaseTy { base: NumberTyBase }
 
-mkFunTy :: TmVar -> Ty -> Ty -> Ty
+mkFunTy :: Var -> Ty -> Ty -> Ty
 mkFunTy prm dom cod = FunTy { prm, dom, cod }
+
+prettyTy :: Ty -> String
+prettyTy (BaseTy bt) = showTyBase bt.base
+prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> show ty.dom <> ") -> " <> show ty.cod
+
+showTyBase :: TyBase -> String
+showTyBase NumberTyBase = "Number"
+showTyBase StringTyBase = "String"
+
+prettyVar :: Var -> String
+prettyVar (Var x) = x.name <> maybe "" (\i -> "@" <> show i) x.mb_index
 
 --------------------------------------------------------------------------------
 
@@ -72,13 +83,13 @@ derive instance Functor Tm_
 
 type LitTm = { lit :: TmLit }
 
-type VarTm = { var :: TmVar }
+type VarTm = { var :: Var }
 
 type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
 type FunTm an = FunTm_ (Record an)
-type FunTm_ an = { prm :: TmVar, dom :: Ty, body :: Tm_ an }
+type FunTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 
 type CloTm an = CloTm_ (Record an)
 type CloTm_ an = { env :: ExeEnv_ an, body :: Tm_ an }
@@ -102,13 +113,13 @@ mkNumberLitTm v = LitTm { lit: NumberTmLit v } {}
 mkStringLitTm :: String -> Tm ()
 mkStringLitTm v = LitTm { lit: StringTmLit v } {}
 
-mkVarTm :: TmVar -> Tm ()
-mkVarTm var = VarTm { var } {}
+mkVar :: Var -> Tm ()
+mkVar var = VarTm { var } {}
 
 mkAppTm :: Tm () -> Tm () -> Tm ()
 mkAppTm apl arg = AppTm { apl, arg } {}
 
-mkFunTm :: TmVar -> Ty -> Tm () -> Tm ()
+mkFunTm :: Var -> Ty -> Tm () -> Tm ()
 mkFunTm prm dom body = FunTm { prm, dom, body } {}
 
 mkInputTm :: String -> Tm ()
@@ -146,7 +157,7 @@ getAnOfSemTm (FunSemTm _ an) = an
 
 --------------------------------------------------------------------------------
 
-newtype TyCtx = TyCtx (List (TmVar /\ Ty))
+newtype TyCtx = TyCtx (List (Var /\ Ty))
 
 derive instance Newtype TyCtx _
 
@@ -159,7 +170,7 @@ derive newtype instance Eq TyCtx
 type ExeEnv an = ExeEnv_ (Record an)
 
 newtype ExeEnv_ :: Type -> Type
-newtype ExeEnv_ an = ExeEnv (List (TmVar /\ Tm_ an))
+newtype ExeEnv_ an = ExeEnv (List (Var /\ Tm_ an))
 
 derive instance Newtype (ExeEnv_ an) _
 
@@ -171,13 +182,13 @@ derive instance Functor ExeEnv_
 
 --------------------------------------------------------------------------------
 
-newtype TmVar = TmVar { name :: String, mb_index :: Maybe Int }
+newtype Var = Var { name :: String, mb_index :: Maybe Int }
 
-derive instance Newtype TmVar _
+derive instance Newtype Var _
 
-derive newtype instance Show TmVar
+derive newtype instance Show Var
 
-derive newtype instance Eq TmVar
+derive newtype instance Eq Var
 
 --------------------------------------------------------------------------------
 

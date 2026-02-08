@@ -2,7 +2,7 @@ module Doxotry.Language.Execution where
 
 import Prelude
 
-import Doxotry.Language.Grammar (SemTm, SemTm_(..), TmVar(..), Tm_(..), Ty(..), getAnOfTm)
+import Doxotry.Language.Grammar (SemTm, SemTm_(..), Var(..), Tm_(..), Ty(..), getAnOfTm)
 import Doxotry.Language.Typing (TypedAn, TypedTm)
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
@@ -61,12 +61,12 @@ reifyTm (FunSemTm tm an) = do
   ty <- case an.ty of
     FunTy ty -> pure ty
     ty -> throwError $ Err { message: "cannot reify semantic term since it was reflected as a function term but it is annotated with the non-function type " <> show ty }
-  prm <- freshVarTm tm.name
+  prm <- freshVar tm.name
   body <-
     reifyTm =<<
       tm.run
         ( reflectTm $
-            VarTm
+            Var
               { var: prm }
               (an # Record.set (Proxy @"ty") ty.dom)
 
@@ -74,7 +74,7 @@ reifyTm (FunSemTm tm an) = do
   pure $ FunTm { prm, dom: ty.dom, body } an
 reifyTm (SynSemTm tm) = pure tm
 
-freshVarTm :: forall m. MonadState Env m => String -> m TmVar
-freshVarTm name = do
+freshVar :: forall m. MonadState Env m => String -> m Var
+freshVar name = do
   { freshVarCounter: index } <- modify (\env -> env { freshVarCounter = env.freshVarCounter + 1 })
-  pure $ TmVar { name, mb_index: Just index }
+  pure $ Var { name, mb_index: Just index }

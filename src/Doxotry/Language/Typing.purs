@@ -10,7 +10,7 @@ import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
-import Doxotry.Language.Grammar (Tm, TmLit(..), TmVar, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
+import Doxotry.Language.Grammar (Tm, TmLit(..), Var, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -57,12 +57,12 @@ checkTm
 -- LitTm
 checkTm ty@(BaseTy { base: StringTyBase }) (LitTm tl@({ lit: StringTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
--- VarTm
-checkTm ty tm0@(VarTm tm an) = do
-  ty' <- getTypeOfTmVar tm.var
+-- Var
+checkTm ty tm0@(Var tm an) = do
+  ty' <- getTypeOfVar tm.var
   unless (ty == ty') do
     throwError $ Error { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
-  pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
+  pure $ Var { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 checkTm ty (AppTm tm an) = do
   apl <- case tm.apl of
@@ -102,13 +102,13 @@ checkTm ty (InputTm tm an) = do
 -- type error
 checkTm ty tm = throwError $ Error { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
 
-extendTyCtx :: forall m a. MonadReader Ctx m => TmVar -> Ty -> m a -> m a
+extendTyCtx :: forall m a. MonadReader Ctx m => Var -> Ty -> m a -> m a
 extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.Cons (x /\ ty)) }) ma
 
 --------------------------------------------------------------------------------
 
-getTypeOfTmVar :: forall m. MonadReader Ctx m => MonadThrow Error m => TmVar -> m Ty
-getTypeOfTmVar x = do
+getTypeOfVar :: forall m. MonadReader Ctx m => MonadThrow Error m => Var -> m Ty
+getTypeOfVar x = do
   ctx <- ask
   ctx.tyCtx
     # unwrap
