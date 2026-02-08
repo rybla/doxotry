@@ -50,7 +50,7 @@ mkFunTy prm dom cod = FunTy { prm, dom, cod }
 
 prettyTy :: Ty -> String
 prettyTy (BaseTy bt) = showTyBase bt.base
-prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> show ty.dom <> ") -> " <> show ty.cod
+prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> ") -> " <> prettyTy ty.cod
 
 showTyBase :: TyBase -> String
 showTyBase NumberTyBase = "Number"
@@ -69,7 +69,6 @@ data Tm_ an
   | VarTm VarTm an
   | AppTm (AppTm_ an) an
   | FunTm (FunTm_ an) an
-  | CloTm (CloTm_ an) an
   | InputTm InputTm an
 
 derive instance Generic (Tm_ an) _
@@ -91,9 +90,6 @@ type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 type FunTm an = FunTm_ (Record an)
 type FunTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 
-type CloTm an = CloTm_ (Record an)
-type CloTm_ an = { env :: ExeEnv_ an, body :: Tm_ an }
-
 type InputTm = { prompt :: String }
 
 data TmLit
@@ -106,6 +102,17 @@ derive instance Generic TmLit _
 
 instance Show TmLit where
   show x = genericShow x
+
+prettyTm :: forall an. Tm an -> String
+prettyTm (LitTm tm _) = prettyLit tm.lit
+prettyTm (VarTm tm _) = prettyVar tm.var
+prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
+prettyTm (FunTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " -> " <> prettyTm tm.body <> ")"
+prettyTm (InputTm tm _) = "(#input " <> show tm.prompt <> ")"
+
+prettyLit :: TmLit -> String
+prettyLit (NumberTmLit v) = show v
+prettyLit (StringTmLit v) = show v
 
 mkNumberLitTm :: Number -> Tm ()
 mkNumberLitTm v = LitTm { lit: NumberTmLit v } {}
@@ -130,7 +137,6 @@ getAnOfTm (LitTm _ an) = an
 getAnOfTm (VarTm _ an) = an
 getAnOfTm (AppTm _ an) = an
 getAnOfTm (FunTm _ an) = an
-getAnOfTm (CloTm _ an) = an
 getAnOfTm (InputTm _ an) = an
 
 modifySurfaceAnOfTm :: forall an. (an -> an) -> Tm_ an -> Tm_ an
@@ -138,7 +144,6 @@ modifySurfaceAnOfTm f (LitTm tm an) = LitTm tm (f an)
 modifySurfaceAnOfTm f (VarTm tm an) = VarTm tm (f an)
 modifySurfaceAnOfTm f (AppTm tm an) = AppTm tm (f an)
 modifySurfaceAnOfTm f (FunTm tm an) = FunTm tm (f an)
-modifySurfaceAnOfTm f (CloTm tm an) = CloTm tm (f an)
 modifySurfaceAnOfTm f (InputTm tm an) = InputTm tm (f an)
 
 --------------------------------------------------------------------------------

@@ -1,8 +1,50 @@
 [
   [
+    "Doxotry Language Typing check \"hello world\" :? String",
+    {
+      "timestamp": "1770574566495.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check (LitTm { lit: (NumberTmLit 100.0) } {}) :: (BaseTy { base: NumberTyBase })",
+    {
+      "timestamp": "1770574551856.0",
+      "success": true
+    }
+  ],
+  [
     "Doxotry Language Typing check (LitTm { lit: (StringTmLit \"hello world\") } {}) :: (BaseTy { base: StringTyBase })",
     {
-      "timestamp": "1770573477305.0",
+      "timestamp": "1770574551856.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check 100.0 :? Number",
+    {
+      "timestamp": "1770574566495.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check not \"hello world\" : Number",
+    {
+      "timestamp": "1770574695420.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes \"hello world\" : String",
+    {
+      "timestamp": "1770574695420.0",
+      "success": true
+    }
+  ],
+  [
+    "Doxotry Language Typing check yes 100.0 : Number",
+    {
+      "timestamp": "1770574695420.0",
       "success": true
     }
   ],

@@ -10,7 +10,7 @@ import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
-import Doxotry.Language.Grammar (Tm, TmLit(..), Var, Tm_(..), Ty(..), TyBase(..), TyCtx(..))
+import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, prettyTm, prettyTy, prettyVar)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -58,16 +58,16 @@ checkTm
 checkTm ty@(BaseTy { base: StringTyBase }) (LitTm tl@({ lit: StringTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 checkTm ty@(BaseTy { base: NumberTyBase }) (LitTm tl@({ lit: NumberTmLit _ }) an) = pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 -- Var
-checkTm ty tm0@(Var tm an) = do
+checkTm ty tm0@(VarTm tm an) = do
   ty' <- getTypeOfVar tm.var
   unless (ty == ty') do
-    throwError $ Error { message: "var " <> show tm0 <> " was expected to have type " <> show ty <> ", but it actually has type " <> show ty' }
-  pure $ Var { var: tm.var } (Record.insert (Proxy @"ty") ty an)
+    throwError $ Error { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty' }
+  pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 checkTm ty (AppTm tm an) = do
   apl <- case tm.apl of
     FunTm apl _ -> pure apl
-    apl -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> show apl }
+    apl -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm apl }
   arg' <- checkTm apl.dom tm.arg
   body' <- checkTm ty apl.body
   pure $ AppTm
@@ -83,9 +83,9 @@ checkTm ty (AppTm tm an) = do
 checkTm ty tm0@(FunTm tm an) = do
   funTy <- case ty of
     FunTy funTy -> pure funTy
-    _ -> throwError $ Error { message: "The term " <> show tm0 <> " was expected to have a non-function type " <> show ty <> ", but it is actually a function term" }
+    _ -> throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term" }
   unless (funTy.dom == tm.dom) do
-    throwError $ Error { message: "The term " <> show tm <> " was expected to be a function term with domain " <> show funTy.dom <> ", but it actually had domain " <> show tm.dom }
+    throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy funTy.dom <> ", but it actually had domain " <> prettyTy tm.dom }
   body' <-
     extendTyCtx tm.prm tm.dom do
       checkTm funTy.cod tm.body
@@ -100,7 +100,7 @@ checkTm ty (InputTm tm an) = do
       { prompt: tm.prompt }
       (Record.insert (Proxy @"ty") ty an)
 -- type error
-checkTm ty tm = throwError $ Error { message: "The term " <> show tm <> " was expected to have type " <> show ty <> ", but it can't have that type." }
+checkTm ty tm = throwError $ Error { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type." }
 
 extendTyCtx :: forall m a. MonadReader Ctx m => Var -> Ty -> m a -> m a
 extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.Cons (x /\ ty)) }) ma
@@ -117,5 +117,5 @@ getTypeOfVar x = do
             guard $ x == x'
             pure ty
         )
-    # maybe (throwError $ Error { message: "Could not find a variable in context of the name " <> show x }) pure
+    # maybe (throwError $ Error { message: "Could not find a variable in context of the name " <> prettyVar x }) pure
 

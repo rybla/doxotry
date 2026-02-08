@@ -66,7 +66,7 @@ reifyTm (FunSemTm tm an) = do
     reifyTm =<<
       tm.run
         ( reflectTm $
-            Var
+            VarTm
               { var: prm }
               (an # Record.set (Proxy @"ty") ty.dom)
 
