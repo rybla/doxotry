@@ -32,13 +32,15 @@ mkEnv :: Env
 mkEnv =
   {}
 
-newtype Error = Error
+type Error an = Error_ (Record an)
+newtype Error_ an = Error
   { message :: String
+  , subject :: Tm_ an
   }
 
-derive newtype instance Show Error
+derive newtype instance Show an => Show (Error_ an)
 
-derive newtype instance Eq Error
+derive newtype instance Eq an => Eq (Error_ an)
 
 --------------------------------------------------------------------------------
 
@@ -50,7 +52,7 @@ type TypedAn an = (ty :: Ty | an)
 typecheckTm
   :: forall m an
    . MonadReader Ctx m
-  => MonadThrow Error m
+  => MonadThrow (Error an) m
   => MonadWriter (Array Log) m
   => Lacks "ty" an
   => Show (Record an)
@@ -67,16 +69,22 @@ typecheckTm ty@(BaseTy { base: NumberTyBase }) tm0@(LitTm tl@({ lit: NumberTmLit
 -- Var
 typecheckTm ty tm0@(VarTm tm an) = do
   log_typecheckTm ty tm0
-  ty' <- getTypeOfVar tm.var
+  ty' <- getTypeOfVar tm.var an
   unless (ty == ty') do
-    throwError $ Error { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty' }
+    throwError $ Error
+      { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty'
+      , subject: tm0
+      }
   pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 typecheckTm ty tm0@(AppTm tm an) = do
   log_typecheckTm ty tm0
   f <- case tm.apl of
     LamTm f _ -> pure f
-    f -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm f }
+    f -> throwError $ Error
+      { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm f
+      , subject: tm0
+      }
   arg' <- typecheckTm f.dom tm.arg
   b <-
     extendTyCtx f.prm f.dom do
@@ -95,9 +103,15 @@ typecheckTm ty tm0@(LamTm tm an) = do
   log_typecheckTm ty tm0
   phi <- case ty of
     FunTy phi -> pure phi
-    _ -> throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term" }
+    _ -> throwError $ Error
+      { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term"
+      , subject: tm0
+      }
   unless (phi.dom == tm.dom) do
-    throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy phi.dom <> ", but it actually had domain " <> prettyTy tm.dom }
+    throwError $ Error
+      { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy phi.dom <> ", but it actually had domain " <> prettyTy tm.dom
+      , subject: tm0
+      }
   b <-
     extendTyCtx tm.prm tm.dom do
       typecheckTm phi.cod tm.body
@@ -115,7 +129,10 @@ typecheckTm ty tm0@(InputTm tm an) = do
 -- type error
 typecheckTm ty tm = do
   tellLog "typecheckTm" $ prettyTm tm <> " : " <> prettyTy ty
-  throwError $ Error { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type." }
+  throwError $ Error
+    { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type."
+    , subject: tm
+    }
 
 log_typecheckTm
   :: forall m an
@@ -133,8 +150,8 @@ extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.
 
 --------------------------------------------------------------------------------
 
-getTypeOfVar :: forall m. MonadReader Ctx m => MonadThrow Error m => Var -> m Ty
-getTypeOfVar x = do
+getTypeOfVar :: forall m an. MonadReader Ctx m => MonadThrow (Error an) m => Var -> Record an -> m Ty
+getTypeOfVar x an = do
   ctx <- ask
   ctx.tyCtx
     # unwrap
@@ -143,4 +160,10 @@ getTypeOfVar x = do
             guard $ x == x'
             pure ty
         )
-    # maybe (throwError $ Error { message: "Unrecognized variable find a variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx }) pure
+    # maybe
+        ( throwError $ Error
+            { message: "Unrecognized variable find a variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx
+            , subject: VarTm { var: x } an
+            }
+        )
+        pure

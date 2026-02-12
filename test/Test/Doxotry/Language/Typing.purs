@@ -12,7 +12,7 @@ import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
 import Doxotry.Language.Grammar (Tm_, Ty, prettyTm, prettyTy)
-import Doxotry.Language.Syntax (app, arrTy, lam, number, numberTy, ref, string, stringTy)
+import Doxotry.Language.Syntax (number, numberTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
 import Doxotry.Language.Typing (typecheckTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
@@ -31,28 +31,21 @@ spec = describe "Typing" do
       numberTy
       (string "hello world")
     it_typechecks true
-      (arrTy "x" stringTy stringTy)
-      (lam "x" stringTy (ref "x"))
+      ([ "x" &: stringTy ] &-> stringTy)
+      ([ "x" &: stringTy ] &=> ref "x")
     it_typechecks false
-      (arrTy "x" stringTy numberTy)
-      (lam "x" stringTy (ref "x"))
+      ([ "x" &: stringTy ] &-> numberTy)
+      ([ "x" &: stringTy ] &=> ref "x")
     it_typechecks false
-      (arrTy "x" numberTy stringTy)
-      (lam "x" stringTy (ref "x"))
+      ([ "x" &: numberTy ] &-> numberTy)
+      ([ "x" &: stringTy ] &=> ref "x")
     it_typechecks true
       stringTy
-      (app (lam "x" stringTy (ref "x")) (string "hello world"))
+      (([ "x" &: stringTy ] &=> ref "x") & [ string "hello world" ])
     it_typechecks false
       stringTy
-      ( app
-          ( app
-              ( lam "x" stringTy
-                  $ lam "y" stringTy
-                  $ ref "x"
-              ) $
-              (string "hello")
-          )
-          (string "world")
+      ( ([ "x" &: stringTy, "y" &: stringTy ] &=> ref "x") &
+          [ string "hello", string "world" ]
       )
 
 it_typechecks
