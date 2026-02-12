@@ -14,7 +14,7 @@ import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
 import Doxotry.Language.Execution (mkCtx, mkEnv, norm)
 import Doxotry.Language.Grammar (Tm, Ty, prettyTm)
-import Doxotry.Language.Syntax (number, numberTy, string, stringTy, (&), (&:), (&=>))
+import Doxotry.Language.Syntax (number, numberTy, ref, string, stringTy, (&), (&:), (&=>))
 import Doxotry.Language.Typing as Typing
 import Effect.Exception (error)
 import Test.Spec (Spec, describe, it)
@@ -22,16 +22,19 @@ import Test.Spec.Assertions (shouldEqual)
 
 spec :: Spec Unit
 spec = describe "Execution" do
-  it_norms true stringTy
-    (string "hello world")
-    (string "hello world")
-  it_norms true numberTy
-    (number 101.0)
-    (number 101.0)
-  it_norms true stringTy
-    (([ "x" &: stringTy ] &=> string "hello world") & [ string "ignore this" ])
-    (string "hello world")
-  pure unit
+  describe "norm" do
+    it_norms true stringTy
+      (string "hello world")
+      (string "hello world")
+    it_norms true numberTy
+      (number 101.0)
+      (number 101.0)
+    it_norms true stringTy
+      (([ "x" &: stringTy ] &=> string "hello world") & [ string "ignore this" ])
+      (string "hello world")
+    it_norms true stringTy
+      (([ "x" &: stringTy ] &=> ref "x") & [ string "hello world" ])
+      (string "hello world")
 
 it_norms
   :: Boolean
