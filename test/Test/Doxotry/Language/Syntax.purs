@@ -9,12 +9,11 @@ import Test.Spec.Assertions (shouldEqual)
 spec :: Spec Unit
 spec = describe "Syntax" do
   describe "elaboration" do
-    it "handles nullary arrow types" do
+    "handles 0-arity arrow types" `it` do
       shouldEqual
         ([] &-> stringTy)
         stringTy
-    it "handles n-ary arrow types" do
+    "n-arity arrow types" `it` do
       shouldEqual
         ([ "x" &: stringTy, "y" &: stringTy ] &-> stringTy)
         ([ "x" &: stringTy ] &-> [ "y" &: stringTy ] &-> stringTy)
-
