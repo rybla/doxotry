@@ -20,7 +20,8 @@ type Ctx an = { defaultAn :: Record an }
 
 type Env = { freshVarCounter :: Int }
 
-newtype Err = Err { message :: String }
+type Err an = Err_ (Record an)
+newtype Err_ an = Err { message :: String }
 
 --------------------------------------------------------------------------------
 
@@ -32,7 +33,7 @@ reflectTm
   :: forall m an
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => Lacks "ty" an
   => TypedTm an
   -> TypedSemTm m an
@@ -50,10 +51,10 @@ reflectTm tm | FunTy ty <- (tm # getAnOfTm).ty = do
 reflectTm tm = SynSemTm tm
 
 reifyTm
-  :: forall m (an :: Row Type)
+  :: forall m an
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => Lacks "ty" an
   => TypedSemTm m an
   -> m (TypedTm an)
