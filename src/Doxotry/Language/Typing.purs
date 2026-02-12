@@ -74,36 +74,36 @@ checkTm ty tm0@(VarTm tm an) = do
 -- AppTm
 checkTm ty tm0@(AppTm tm an) = do
   log_checkTm ty tm0
-  apl <- case tm.apl of
-    FunTm apl _ -> pure apl
-    apl -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm apl }
-  arg' <- checkTm apl.dom tm.arg
-  body' <-
-    extendTyCtx apl.prm apl.dom do
-      checkTm ty apl.body
+  f <- case tm.apl of
+    LamTm f _ -> pure f
+    f -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm f }
+  arg' <- checkTm f.dom tm.arg
+  b <-
+    extendTyCtx f.prm f.dom do
+      checkTm ty f.body
   pure $ AppTm
     { apl:
-        FunTm
-          { prm: apl.prm, dom: apl.dom, body: body' }
-          (Record.insert (Proxy @"ty") (FunTy { prm: apl.prm, dom: apl.dom, cod: ty }) an)
+        LamTm
+          { prm: f.prm, dom: f.dom, body: b }
+          (Record.insert (Proxy @"ty") (FunTy { prm: f.prm, dom: f.dom, cod: ty }) an)
     , arg: arg'
     }
     (Record.insert (Proxy @"ty") ty an)
 
--- FunTm
-checkTm ty tm0@(FunTm tm an) = do
+-- LamTm
+checkTm ty tm0@(LamTm tm an) = do
   log_checkTm ty tm0
-  funTy <- case ty of
-    FunTy funTy -> pure funTy
+  phi <- case ty of
+    FunTy phi -> pure phi
     _ -> throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term" }
-  unless (funTy.dom == tm.dom) do
-    throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy funTy.dom <> ", but it actually had domain " <> prettyTy tm.dom }
-  body' <-
+  unless (phi.dom == tm.dom) do
+    throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy phi.dom <> ", but it actually had domain " <> prettyTy tm.dom }
+  b <-
     extendTyCtx tm.prm tm.dom do
-      checkTm funTy.cod tm.body
+      checkTm phi.cod tm.body
   pure $
-    FunTm
-      { prm: tm.prm, dom: tm.dom, body: body' }
+    LamTm
+      { prm: tm.prm, dom: tm.dom, body: b }
       (Record.insert (Proxy @"ty") ty an)
 -- InputTm
 checkTm ty tm0@(InputTm tm an) = do

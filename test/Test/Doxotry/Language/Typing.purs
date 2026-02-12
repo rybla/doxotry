@@ -2,8 +2,6 @@ module Test.Doxotry.Language.Typing where
 
 import Prelude
 
-import Doxotry.Language.Grammar (Tm_, Ty, mkAppTm, mkFunTm, mkFunTy, mkNumberTm, mkNumberTy, mkStringTm, mkStringTy, mkVar, mkVarTm, prettyTm, prettyTy)
-import Doxotry.Language.Typing (checkTm, mkCtx)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Writer (runWriterT)
@@ -13,6 +11,9 @@ import Data.Identity (Identity)
 import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
+import Doxotry.Language.Grammar (Tm_, Ty, prettyTm, prettyTy)
+import Doxotry.Language.Syntax (mkAppTm, mkArrTy, mkLamTm, mkNumberTm, mkNumberTy, mkStringTm, mkStringTy, mkVarTm)
+import Doxotry.Language.Typing (checkTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail)
@@ -30,23 +31,23 @@ spec = describe "Typing" do
       mkNumberTy
       (mkStringTm "hello world")
     it_checks true
-      (mkFunTy (mkVar "x") mkStringTy mkStringTy)
-      (mkFunTm (mkVar "x") mkStringTy (mkVarTm "x"))
+      (mkArrTy "x" mkStringTy mkStringTy)
+      (mkLamTm "x" mkStringTy (mkVarTm "x"))
     it_checks false
-      (mkFunTy (mkVar "x") mkStringTy mkNumberTy)
-      (mkFunTm (mkVar "x") mkStringTy (mkVarTm "x"))
+      (mkArrTy "x" mkStringTy mkNumberTy)
+      (mkLamTm "x" mkStringTy (mkVarTm "x"))
     it_checks false
-      (mkFunTy (mkVar "x") mkNumberTy mkStringTy)
-      (mkFunTm (mkVar "x") mkStringTy (mkVarTm "x"))
+      (mkArrTy "x" mkNumberTy mkStringTy)
+      (mkLamTm "x" mkStringTy (mkVarTm "x"))
     it_checks true
       mkStringTy
-      (mkAppTm (mkFunTm (mkVar "x") mkStringTy (mkVarTm "x")) (mkStringTm "hello world"))
+      (mkAppTm (mkLamTm "x" mkStringTy (mkVarTm "x")) (mkStringTm "hello world"))
     it_checks false
       mkStringTy
       ( mkAppTm
           ( mkAppTm
-              ( mkFunTm (mkVar "x") mkStringTy
-                  $ mkFunTm (mkVar "y") mkStringTy
+              ( mkLamTm "x" mkStringTy
+                  $ mkLamTm "y" mkStringTy
                   $ mkVarTm "x"
               ) $
               (mkStringTm "hello")

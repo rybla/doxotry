@@ -6,7 +6,7 @@ import Data.Eq.Generic (genericEq)
 import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\), (/\))
@@ -40,15 +40,6 @@ instance Show TyBase where
 
 derive instance Eq TyBase
 
-mkStringTy :: Ty
-mkStringTy = BaseTy { base: StringTyBase }
-
-mkNumberTy :: Ty
-mkNumberTy = BaseTy { base: NumberTyBase }
-
-mkFunTy :: Var -> Ty -> Ty -> Ty
-mkFunTy prm dom cod = FunTy { prm, dom, cod }
-
 prettyTy :: Ty -> String
 prettyTy (BaseTy bt) = showTyBase bt.base
 prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> " -> " <> prettyTy ty.cod <> ")"
@@ -69,7 +60,7 @@ data Tm_ an
   = LitTm LitTm an
   | VarTm VarTm an
   | AppTm (AppTm_ an) an
-  | FunTm (FunTm_ an) an
+  | LamTm (LamTm_ an) an
   | InputTm InputTm an
 
 derive instance Generic (Tm_ an) _
@@ -88,8 +79,8 @@ type VarTm = { var :: Var }
 type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
-type FunTm an = FunTm_ (Record an)
-type FunTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
+type LamTm an = LamTm_ (Record an)
+type LamTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 
 type InputTm = { prompt :: String }
 
@@ -108,43 +99,25 @@ prettyTm :: forall an. Tm an -> String
 prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
-prettyTm (FunTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
+prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
 prettyTm (InputTm tm _) = "(#input " <> show tm.prompt <> ")"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
 prettyLit (StringTmLit v) = show v
 
-mkNumberTm :: Number -> Tm ()
-mkNumberTm v = LitTm { lit: NumberTmLit v } {}
-
-mkStringTm :: String -> Tm ()
-mkStringTm v = LitTm { lit: StringTmLit v } {}
-
-mkVarTm :: String -> Tm ()
-mkVarTm name = VarTm { var: Var { name, mb_index: Nothing } } {}
-
-mkAppTm :: Tm () -> Tm () -> Tm ()
-mkAppTm apl arg = AppTm { apl, arg } {}
-
-mkFunTm :: Var -> Ty -> Tm () -> Tm ()
-mkFunTm prm dom body = FunTm { prm, dom, body } {}
-
-mkInputTm :: String -> Tm ()
-mkInputTm prompt = InputTm { prompt } {}
-
 getAnOfTm :: forall an. Tm_ an -> an
 getAnOfTm (LitTm _ an) = an
 getAnOfTm (VarTm _ an) = an
 getAnOfTm (AppTm _ an) = an
-getAnOfTm (FunTm _ an) = an
+getAnOfTm (LamTm _ an) = an
 getAnOfTm (InputTm _ an) = an
 
 modifySurfaceAnOfTm :: forall an. (an -> an) -> Tm_ an -> Tm_ an
 modifySurfaceAnOfTm f (LitTm tm an) = LitTm tm (f an)
 modifySurfaceAnOfTm f (VarTm tm an) = VarTm tm (f an)
 modifySurfaceAnOfTm f (AppTm tm an) = AppTm tm (f an)
-modifySurfaceAnOfTm f (FunTm tm an) = FunTm tm (f an)
+modifySurfaceAnOfTm f (LamTm tm an) = LamTm tm (f an)
 modifySurfaceAnOfTm f (InputTm tm an) = InputTm tm (f an)
 
 --------------------------------------------------------------------------------
@@ -198,9 +171,6 @@ derive instance Newtype Var _
 derive newtype instance Show Var
 
 derive newtype instance Eq Var
-
-mkVar :: String -> Var
-mkVar name = Var { name, mb_index: Nothing }
 
 --------------------------------------------------------------------------------
 

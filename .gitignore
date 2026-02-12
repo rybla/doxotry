@@ -40,3 +40,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .spago
 output
 client_purescript_dist
+
+.psci_modules
+.spec-results

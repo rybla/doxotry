@@ -71,7 +71,7 @@ reifyTm (FunSemTm tm an) = do
               (an # Record.set (Proxy @"ty") ty.dom)
 
         )
-  pure $ FunTm { prm, dom: ty.dom, body } an
+  pure $ LamTm { prm, dom: ty.dom, body } an
 reifyTm (SynSemTm tm) = pure tm
 
 freshVar :: forall m. MonadState Env m => String -> m Var
