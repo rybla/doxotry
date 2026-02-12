@@ -47,7 +47,7 @@ type TypedAn an = (ty :: Ty | an)
 
 --------------------------------------------------------------------------------
 
-checkTm
+typecheckTm
   :: forall m an
    . MonadReader Ctx m
   => MonadThrow Error m
@@ -58,29 +58,29 @@ checkTm
   -> Tm an
   -> m (TypedTm an)
 -- LitTm
-checkTm ty@(BaseTy { base: StringTyBase }) tm0@(LitTm tl@({ lit: StringTmLit _ }) an) = do
-  log_checkTm ty tm0
+typecheckTm ty@(BaseTy { base: StringTyBase }) tm0@(LitTm tl@({ lit: StringTmLit _ }) an) = do
+  log_typecheckTm ty tm0
   pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
-checkTm ty@(BaseTy { base: NumberTyBase }) tm0@(LitTm tl@({ lit: NumberTmLit _ }) an) = do
-  log_checkTm ty tm0
+typecheckTm ty@(BaseTy { base: NumberTyBase }) tm0@(LitTm tl@({ lit: NumberTmLit _ }) an) = do
+  log_typecheckTm ty tm0
   pure $ LitTm tl (Record.insert (Proxy @"ty") ty an)
 -- Var
-checkTm ty tm0@(VarTm tm an) = do
-  log_checkTm ty tm0
+typecheckTm ty tm0@(VarTm tm an) = do
+  log_typecheckTm ty tm0
   ty' <- getTypeOfVar tm.var
   unless (ty == ty') do
     throwError $ Error { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty' }
   pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
-checkTm ty tm0@(AppTm tm an) = do
-  log_checkTm ty tm0
+typecheckTm ty tm0@(AppTm tm an) = do
+  log_typecheckTm ty tm0
   f <- case tm.apl of
     LamTm f _ -> pure f
     f -> throwError $ Error { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm f }
-  arg' <- checkTm f.dom tm.arg
+  arg' <- typecheckTm f.dom tm.arg
   b <-
     extendTyCtx f.prm f.dom do
-      checkTm ty f.body
+      typecheckTm ty f.body
   pure $ AppTm
     { apl:
         LamTm
@@ -91,8 +91,8 @@ checkTm ty tm0@(AppTm tm an) = do
     (Record.insert (Proxy @"ty") ty an)
 
 -- LamTm
-checkTm ty tm0@(LamTm tm an) = do
-  log_checkTm ty tm0
+typecheckTm ty tm0@(LamTm tm an) = do
+  log_typecheckTm ty tm0
   phi <- case ty of
     FunTy phi -> pure phi
     _ -> throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term" }
@@ -100,33 +100,33 @@ checkTm ty tm0@(LamTm tm an) = do
     throwError $ Error { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy phi.dom <> ", but it actually had domain " <> prettyTy tm.dom }
   b <-
     extendTyCtx tm.prm tm.dom do
-      checkTm phi.cod tm.body
+      typecheckTm phi.cod tm.body
   pure $
     LamTm
       { prm: tm.prm, dom: tm.dom, body: b }
       (Record.insert (Proxy @"ty") ty an)
 -- InputTm
-checkTm ty tm0@(InputTm tm an) = do
-  log_checkTm ty tm0
+typecheckTm ty tm0@(InputTm tm an) = do
+  log_typecheckTm ty tm0
   pure $
     InputTm
       { prompt: tm.prompt }
       (Record.insert (Proxy @"ty") ty an)
 -- type error
-checkTm ty tm = do
-  tellLog "checkTm" $ prettyTm tm <> " : " <> prettyTy ty
+typecheckTm ty tm = do
+  tellLog "typecheckTm" $ prettyTm tm <> " : " <> prettyTy ty
   throwError $ Error { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type." }
 
-log_checkTm
+log_typecheckTm
   :: forall m an
    . MonadReader Ctx m
   => MonadWriter (Array Log) m
   => Ty
   -> Tm_ (Record an)
   -> m Unit
-log_checkTm ty tm = do
+log_typecheckTm ty tm = do
   ctx <- ask
-  tellLog "checkTm" $ prettyTyCtx ctx.tyCtx <> " |- " <> prettyTm tm <> " : " <> prettyTy ty
+  tellLog "typecheckTm" $ prettyTyCtx ctx.tyCtx <> " |- " <> prettyTm tm <> " : " <> prettyTy ty
 
 extendTyCtx :: forall m a. MonadReader Ctx m => Var -> Ty -> m a -> m a
 extendTyCtx x ty ma = local (\ctx -> ctx { tyCtx = ctx.tyCtx # over TyCtx (List.Cons (x /\ ty)) }) ma

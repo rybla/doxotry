@@ -12,50 +12,50 @@ import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
 import Doxotry.Language.Grammar (Tm_, Ty, prettyTm, prettyTy)
-import Doxotry.Language.Syntax (mkAppTm, mkArrTy, mkLamTm, mkNumberTm, mkNumberTy, mkStringTm, mkStringTy, mkVarTm)
-import Doxotry.Language.Typing (checkTm, mkCtx)
+import Doxotry.Language.Syntax (app, arrTy, lam, number, numberTy, ref, string, stringTy)
+import Doxotry.Language.Typing (typecheckTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail)
 
 spec :: Spec Unit
 spec = describe "Typing" do
-  describe "check" do
-    it_checks true
-      mkStringTy
-      (mkStringTm "hello world")
-    it_checks true
-      mkNumberTy
-      (mkNumberTm 100.0)
-    it_checks false
-      mkNumberTy
-      (mkStringTm "hello world")
-    it_checks true
-      (mkArrTy "x" mkStringTy mkStringTy)
-      (mkLamTm "x" mkStringTy (mkVarTm "x"))
-    it_checks false
-      (mkArrTy "x" mkStringTy mkNumberTy)
-      (mkLamTm "x" mkStringTy (mkVarTm "x"))
-    it_checks false
-      (mkArrTy "x" mkNumberTy mkStringTy)
-      (mkLamTm "x" mkStringTy (mkVarTm "x"))
-    it_checks true
-      mkStringTy
-      (mkAppTm (mkLamTm "x" mkStringTy (mkVarTm "x")) (mkStringTm "hello world"))
-    it_checks false
-      mkStringTy
-      ( mkAppTm
-          ( mkAppTm
-              ( mkLamTm "x" mkStringTy
-                  $ mkLamTm "y" mkStringTy
-                  $ mkVarTm "x"
+  describe "typecheck" do
+    it_typechecks true
+      stringTy
+      (string "hello world")
+    it_typechecks true
+      numberTy
+      (number 100.0)
+    it_typechecks false
+      numberTy
+      (string "hello world")
+    it_typechecks true
+      (arrTy "x" stringTy stringTy)
+      (lam "x" stringTy (ref "x"))
+    it_typechecks false
+      (arrTy "x" stringTy numberTy)
+      (lam "x" stringTy (ref "x"))
+    it_typechecks false
+      (arrTy "x" numberTy stringTy)
+      (lam "x" stringTy (ref "x"))
+    it_typechecks true
+      stringTy
+      (app (lam "x" stringTy (ref "x")) (string "hello world"))
+    it_typechecks false
+      stringTy
+      ( app
+          ( app
+              ( lam "x" stringTy
+                  $ lam "y" stringTy
+                  $ ref "x"
               ) $
-              (mkStringTm "hello")
+              (string "hello")
           )
-          (mkStringTm "world")
+          (string "world")
       )
 
-it_checks
+it_typechecks
   :: forall an
    . Lacks "ty" an
   => Show (Record an)
@@ -63,9 +63,9 @@ it_checks
   -> Ty
   -> Tm_ (Record an)
   -> Spec Unit
-it_checks success ty tm =
-  it ((if success then "yes " else "no  ") <> prettyTm tm <> " : " <> prettyTy ty) do
-    checkTm ty tm
+it_typechecks success ty tm =
+  it ((if success then "[✅] " else "[❌] ") <> prettyTm tm <> " : " <> prettyTy ty) do
+    typecheckTm ty tm
       # flip runReaderT mkCtx
       # runExceptT
       # runWriterT

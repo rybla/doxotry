@@ -99,7 +99,7 @@ prettyTm :: forall an. Tm an -> String
 prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
-prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " : " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
+prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " :: " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
 prettyTm (InputTm tm _) = "(#input " <> show tm.prompt <> ")"
 
 prettyLit :: TmLit -> String
