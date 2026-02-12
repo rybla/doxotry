@@ -6,6 +6,7 @@ package:
     - halogen
     - prelude
     - record
+    - profunctor-lenses
     - spec
     - spec-node
   test:

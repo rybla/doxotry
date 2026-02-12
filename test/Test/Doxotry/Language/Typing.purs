@@ -59,7 +59,7 @@ it_typechecks
 it_typechecks success ty tm =
   it ((if success then "[✅] " else "[❌] ") <> prettyTm tm <> " : " <> prettyTy ty) do
     typecheckTm ty tm
-      # flip runReaderT mkCtx
+      # flip runReaderT (mkCtx {})
       # runExceptT
       # runWriterT
       # (unwrap :: Identity _ -> _)

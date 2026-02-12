@@ -21,15 +21,15 @@ import Type.Proxy (Proxy(..))
 
 type Ctx = { tyCtx :: TyCtx }
 
-mkCtx :: Ctx
-mkCtx =
+mkCtx :: {} -> Ctx
+mkCtx {} =
   { tyCtx: TyCtx none
   }
 
 type Env = {}
 
-mkEnv :: Env
-mkEnv =
+mkEnv :: {} -> Env
+mkEnv {} =
   {}
 
 type Err an = Err_ (Record an)
@@ -38,7 +38,8 @@ newtype Err_ an = Err
   , subject :: Tm_ an
   }
 
-derive newtype instance Show an => Show (Err_ an)
+instance Show an => Show (Err_ an) where
+  show (Err err) = "Typing error: " <> err.message <> "\nsubject: " <> prettyTm err.subject
 
 derive newtype instance Eq an => Eq (Err_ an)
 
@@ -46,6 +47,9 @@ derive newtype instance Eq an => Eq (Err_ an)
 
 type TypedTm an = Tm (TypedAn an)
 type TypedAn an = (ty :: Ty | an)
+
+erase :: forall an. Lacks "ty" an => TypedTm an -> Tm an
+erase = map (Record.delete (Proxy @"ty"))
 
 --------------------------------------------------------------------------------
 
@@ -162,7 +166,7 @@ getTypeOfVar x an = do
         )
     # maybe
         ( throwError $ Err
-            { message: "Unrecognized variable find a variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx
+            { message: "Unrecognized variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx
             , subject: VarTm { var: x } an
             }
         )

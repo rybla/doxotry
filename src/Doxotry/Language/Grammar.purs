@@ -59,8 +59,8 @@ data Tm_ :: Type -> Type
 data Tm_ an
   = LitTm LitTm an
   | VarTm VarTm an
-  | AppTm (AppTm_ an) an
   | LamTm (LamTm_ an) an
+  | AppTm (AppTm_ an) an
   | InputTm InputTm an
 
 derive instance Generic (Tm_ an) _
@@ -76,11 +76,11 @@ type LitTm = { lit :: TmLit }
 
 type VarTm = { var :: Var }
 
-type AppTm an = AppTm_ (Record an)
-type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
-
 type LamTm an = LamTm_ (Record an)
 type LamTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
+
+type AppTm an = AppTm_ (Record an)
+type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
 type InputTm = { prompt :: String }
 
@@ -95,7 +95,7 @@ derive instance Generic TmLit _
 instance Show TmLit where
   show x = genericShow x
 
-prettyTm :: forall an. Tm an -> String
+prettyTm :: forall an. Tm_ an -> String
 prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
@@ -128,7 +128,7 @@ data SemTm_ m an
   = SynSemTm (Tm_ an)
   | FunSemTm (FunSemTm m an) an
 
-type FunSemTm m an = { name :: String, run :: SemTm_ m an -> m (SemTm_ m an) }
+type FunSemTm m an = { prm :: Var, run :: SemTm_ m an -> m (SemTm_ m an) }
 
 getAnOfSemTm :: forall m an. SemTm_ m an -> an
 getAnOfSemTm (SynSemTm tm) = getAnOfTm tm
@@ -146,21 +146,6 @@ derive newtype instance Eq TyCtx
 
 prettyTyCtx :: TyCtx -> String
 prettyTyCtx (TyCtx xs) = "{" <> (xs # map (\(x /\ ty) -> prettyVar x <> " : " <> prettyTy ty) # intercalate ", ") <> "}"
-
---------------------------------------------------------------------------------
-
-type ExeEnv an = ExeEnv_ (Record an)
-
-newtype ExeEnv_ :: Type -> Type
-newtype ExeEnv_ an = ExeEnv (List (Var /\ Tm_ an))
-
-derive instance Newtype (ExeEnv_ an) _
-
-derive newtype instance Show an => Show (ExeEnv_ an)
-
-derive newtype instance Eq an => Eq (ExeEnv_ an)
-
-derive instance Functor ExeEnv_
 
 --------------------------------------------------------------------------------
 
