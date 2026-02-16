@@ -3,8 +3,10 @@ module Test.Doxotry.Language.Execution where
 import Prelude
 
 import Control.Monad.Except (runExceptT, throwError)
+import Control.Monad.Identity.Trans (runIdentityT)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (evalStateT)
+import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
@@ -12,10 +14,11 @@ import Data.Identity (Identity)
 import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
-import Doxotry.Language.Execution (GenerateType, mkCtx, mkEnv, norm)
+import Doxotry.Language.Execution (Generate(..), mkCtx, mkEnv, norm)
 import Doxotry.Language.Grammar (Tm, Tm_(..), Ty(..), TyBase(..), generate, number, numberTy, prettyTm, ref, string, stringTy, (&), (&->), (&:), (&=>))
 import Doxotry.Language.Typing as Typing
 import Doxotry.Utility (runIdentity)
+import Effect.Aff (Aff)
 import Effect.Exception (error)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -63,6 +66,7 @@ it_norms success ty tm tm_expected =
             Right tm' /\ _ -> pure tm'
             Left err /\ logs -> throwError $ error $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
     norm tm'
+      # runIdentityT
       # flip runReaderT
           ( mkCtx
               { defaultAn: {}
@@ -80,8 +84,8 @@ it_norms success ty tm tm_expected =
           | success -> throwError $ error $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
           | otherwise -> pure unit
 
-generateImpl :: GenerateType
-generateImpl args = defaultTm args.ty
+generateImpl :: forall t. MonadTrans t => Generate t
+generateImpl = Generate \args -> defaultTm args.ty
 
 defaultTm :: forall m. Monad m => Ty -> m (Tm ())
 defaultTm (BaseTy { base: NumberTyBase }) = pure $ number 0.0
@@ -89,4 +93,3 @@ defaultTm (BaseTy { base: StringTyBase }) = pure $ string "hello world"
 defaultTm (ArrTy { prm, dom, cod }) = do
   body <- defaultTm cod
   pure $ LamTm { prm, dom, body } {}
-
