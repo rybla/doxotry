@@ -43,7 +43,7 @@ it_norms
   -> Tm ()
   -> Spec Unit
 it_norms success ty tm tm_expected =
-  it ((if success then "[✅] " else "[❌] ") <> prettyTm tm <> " ▾ " <> prettyTm tm_expected) do
+  it ((if success then "[✅] " else "[❌] ") <> prettyTm tm <> " ===> " <> prettyTm tm_expected) do
     tm' :: Typing.TypedTm () <-
       Typing.typecheckTm ty tm
         # flip runReaderT (Typing.mkCtx {})
