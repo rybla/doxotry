@@ -9,7 +9,7 @@ import Data.Either (Either(..))
 import Data.Foldable (intercalate)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
-import Doxotry.Language.Grammar (Tm_, Ty, generate, number, numberTy, prettyTm, prettyTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
+import Doxotry.Language.Grammar (Tm_, Ty, generate, number, numberTy, prettyTm, prettyTy, ref, string, stringTy, (&), (&->), (&=>))
 import Doxotry.Language.Typing (typecheckTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
@@ -28,20 +28,20 @@ spec = describe "Typing" do
       numberTy
       (string "hello world")
     it_typechecks true
-      ([ "x" &: stringTy ] &-> stringTy)
-      ([ "x" &: stringTy ] &=> ref "x")
+      ([ "x" /\ stringTy ] &-> stringTy)
+      ([ "x" /\ stringTy ] &=> ref "x")
     it_typechecks false
-      ([ "x" &: stringTy ] &-> numberTy)
-      ([ "x" &: stringTy ] &=> ref "x")
+      ([ "x" /\ stringTy ] &-> numberTy)
+      ([ "x" /\ stringTy ] &=> ref "x")
     it_typechecks false
-      ([ "x" &: numberTy ] &-> numberTy)
-      ([ "x" &: stringTy ] &=> ref "x")
+      ([ "x" /\ numberTy ] &-> numberTy)
+      ([ "x" /\ stringTy ] &=> ref "x")
     it_typechecks true
       stringTy
-      (([ "x" &: stringTy ] &=> ref "x") & [ string "hello world" ])
+      (([ "x" /\ stringTy ] &=> ref "x") & [ string "hello world" ])
     it_typechecks false
       stringTy
-      ( ([ "x" &: stringTy, "y" &: stringTy ] &=> ref "x") &
+      ( ([ "x" /\ stringTy, "y" /\ stringTy ] &=> ref "x") &
           [ string "hello", string "world" ]
       )
     it_typechecks true

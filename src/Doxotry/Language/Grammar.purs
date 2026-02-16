@@ -2,13 +2,18 @@ module Doxotry.Language.Grammar where
 
 import Prelude
 
+import Data.Bifunctor (lmap)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable, foldl, foldr, intercalate)
+import Data.FunctorWithIndex (class FunctorWithIndex, mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Data.Tuple (uncurry)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Unfoldable (none)
 
@@ -17,10 +22,13 @@ import Data.Unfoldable (none)
 data Ty
   = BaseTy BaseTy
   | ArrTy ArrTy
+  | RecTy RecTy
 
 type BaseTy = { base :: TyBase }
 
 type ArrTy = { prm :: Var, dom :: Ty, cod :: Ty }
+
+type RecTy = { fields :: Map (Int /\ String) Ty }
 
 derive instance Generic Ty _
 
@@ -44,6 +52,7 @@ derive instance Eq TyBase
 prettyTy :: Ty -> String
 prettyTy (BaseTy bt) = showTyBase bt.base
 prettyTy (ArrTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> " -> " <> prettyTy ty.cod <> ")"
+prettyTy (RecTy ty) = "{" <> (ty.fields # Map.toUnfoldable # map @Array (\((_ /\ x) /\ ty') -> show x <> ": " <> prettyTy ty') # intercalate ", ") <> "}"
 
 showTyBase :: TyBase -> String
 showTyBase NumberTyBase = "Number"
@@ -55,14 +64,13 @@ prettyVar (Var x) = x.name <> maybe "" (\i -> "@" <> show i) x.mb_index
 --------------------------------------------------------------------------------
 
 type Tm an = Tm_ (Record an)
-
-data Tm_ :: Type -> Type
-data Tm_ an
+data Tm_ (an :: Type)
   = LitTm LitTm an
   | VarTm VarTm an
   | LamTm (LamTm_ an) an
   | AppTm (AppTm_ an) an
-  | GenerateTm (GenerateTm_ an) an
+  | GenerateTm GenerateTm an
+  | RecTm (RecTm_ an) an
 
 derive instance Generic (Tm_ an) _
 
@@ -83,10 +91,10 @@ type LamTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
-type GenerateTm an = GenerateTm_ (Record an)
+type GenerateTm = {}
 
-type GenerateTm_ :: Type -> Type
-type GenerateTm_ an = {}
+type RecTm an = RecTm_ (Record an)
+type RecTm_ (an :: Type) = { fields :: Map (Int /\ String) (Tm_ an) }
 
 data TmLit
   = NumberTmLit Number
@@ -105,6 +113,7 @@ prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
 prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " :: " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
 prettyTm (GenerateTm _tm _) = "#generate"
+prettyTm (RecTm tm _) = "{" <> (tm.fields # Map.toUnfoldable # map @Array (\((_ /\ x) /\ a) -> show x <> ": " <> prettyTm a) # intercalate ", ") <> "}"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
@@ -116,6 +125,7 @@ getAnOfTm (VarTm _ an) = an
 getAnOfTm (AppTm _ an) = an
 getAnOfTm (LamTm _ an) = an
 getAnOfTm (GenerateTm _ an) = an
+getAnOfTm (RecTm _ an) = an
 
 getDomOfTm :: forall an. Tm_ an -> Maybe { prm :: Var, dom :: Ty }
 getDomOfTm (LamTm tm _) = pure { prm: tm.prm, dom: tm.dom }
@@ -128,6 +138,7 @@ modifySurfaceAnOfTm f (VarTm tm an) = VarTm tm (f an)
 modifySurfaceAnOfTm f (AppTm tm an) = AppTm tm (f an)
 modifySurfaceAnOfTm f (LamTm tm an) = LamTm tm (f an)
 modifySurfaceAnOfTm f (GenerateTm tm an) = GenerateTm tm (f an)
+modifySurfaceAnOfTm f (RecTm tm an) = RecTm tm (f an)
 
 --------------------------------------------------------------------------------
 
@@ -195,10 +206,13 @@ numberTy = BaseTy { base: NumberTyBase }
 arrTy :: String -> Ty -> Ty -> Ty
 arrTy x dom cod = ArrTy { prm: var x, dom, cod }
 
-arrsTy :: forall f. Foldable f => f Bind -> Ty -> Ty
-arrsTy xs cod = foldr (\(Bind x) -> arrTy x.prm x.dom) cod xs
+arrsTy :: forall f. Foldable f => f (String /\ Ty) -> Ty -> Ty
+arrsTy xs cod = foldr (uncurry arrTy) cod xs
 
 infixr 100 arrsTy as &->
+
+recTy :: forall f. FunctorWithIndex Int f => Foldable f => f (String /\ Ty) -> Ty
+recTy fields = RecTy { fields: fields # mapWithIndex (\i -> lmap (i /\ _)) # Map.fromFoldable }
 
 --------------------------------------------------------------------------------
 -- Syntax for Terms
@@ -224,8 +238,8 @@ infixl 110 apps as &
 lam :: String -> Ty -> Tm () -> Tm ()
 lam prm dom body = LamTm { prm: var prm, dom, body } {}
 
-lams :: forall f. Foldable f => f Bind -> Tm () -> Tm ()
-lams prms body = foldr (\(Bind x) -> lam x.prm x.dom) body prms
+lams :: forall f. Foldable f => f (String /\ Ty) -> Tm () -> Tm ()
+lams prms body = foldr (uncurry lam) body prms
 
 infixr 100 lams as &=>
 
@@ -235,14 +249,6 @@ generate = GenerateTm {} {}
 var :: String -> Var
 var name = Var { name, mb_index: none }
 
---------------------------------------------------------------------------------
---  Syntax Utilities
---------------------------------------------------------------------------------
-
-newtype Bind = Bind { prm :: String, dom :: Ty }
-
-mkBind :: String -> Ty -> Bind
-mkBind prm dom = Bind { prm: prm, dom }
-
-infix 101 mkBind as &:
+rec :: forall f. FunctorWithIndex Int f => Foldable f => f (String /\ Tm ()) -> Tm_ (Record ())
+rec fields = RecTm { fields: fields # mapWithIndex (\i -> lmap (i /\ _)) # Map.fromFoldable } {}
 

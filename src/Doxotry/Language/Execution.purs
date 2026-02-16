@@ -15,6 +15,7 @@ import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Data.Tuple (fst)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Unfoldable (none)
@@ -199,6 +200,10 @@ denote _sigma tm0@(GenerateTm _tm an) = pure $ LamSemTm
       prompt' -> lift $ throwError $ Err { message: "Cannot run generate with this term as a prompt: " <> prettyTm prompt', subject: pure $ erase tm0 }
   }
   an
+denote sigma (RecTm tm an) = do
+  -- TODO: this works, but is this the right place to do it?
+  fields <- tm.fields # traverse (denote sigma >=> reify)
+  pure $ SynSemTm $ RecTm { fields } an
 denote _ tm0 = pure $ SynSemTm tm0
 
 --------------------------------------------------------------------------------

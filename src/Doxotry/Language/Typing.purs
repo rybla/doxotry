@@ -2,17 +2,22 @@ module Doxotry.Language.Typing where
 
 import Prelude
 
-import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, getDomOfTm, prettyTm, prettyTy, prettyTyCtx, prettyVar, stringTy)
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader, ask, local)
 import Control.Monad.Writer (class MonadWriter)
+import Data.Array as Array
+import Data.Foldable (intercalate)
 import Data.List as List
+import Data.Map as Map
 import Data.Maybe (maybe)
 import Data.Newtype (over, unwrap)
+import Data.Set as Set
+import Data.Traversable (traverse)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
 import Doxotry.Language.Common (Log, tellLog)
+import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, getDomOfTm, prettyTm, prettyTy, prettyTyCtx, prettyVar, stringTy)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -114,6 +119,22 @@ typecheckTm ty tm0@(GenerateTm tm an) = do
     GenerateTm
       tm
       (Record.insert (Proxy @"ty") ty an)
+typecheckTm ty0@(RecTy ty) tm0@(RecTm tm an) = do
+  log_typecheckTm ty0 tm0
+  unless ((ty.fields # Map.toUnfoldable # map @Array (\(k /\ _) -> k)) == (tm.fields # Map.toUnfoldable # map @Array (\(k /\ _) -> k))) do
+    let
+      prettyKeys keys = keys # Set.toUnfoldable # map @Array (\(i /\ x) -> "[" <> show i <> "] " <> show x) # intercalate ", "
+      missingKeys = (ty.fields # Map.keys) `Set.difference` (tm.fields # Map.keys) # prettyKeys
+      extraKeys = (tm.fields # Map.keys) `Set.difference` (ty.fields # Map.keys) # prettyKeys
+    throwError $ Err { message: "The record term " <> prettyTm tm0 <> " was expected to have record type " <> prettyTy ty0 <> ", but it doesn't have the expected record keys; missing keys are " <> missingKeys <> "; extra keys are " <> extraKeys, subject: tm0 }
+  fields <-
+    Array.zip (ty.fields # Map.toUnfoldable) (tm.fields # Map.toUnfoldable)
+      # traverse \((k /\ ty') /\ (_ /\ tm')) -> do
+          (k /\ _) <$> typecheckTm ty' tm'
+  pure
+    $ RecTm
+        { fields: Map.fromFoldable fields }
+        (Record.insert (Proxy @"ty") ty0 an)
 -- type error
 typecheckTm ty tm = do
   tellLog "typecheckTm" $ prettyTm tm <> " : " <> prettyTy ty

@@ -10,15 +10,13 @@ import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
-import Data.Identity (Identity)
-import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
 import Doxotry.Language.Execution (Generate(..), mkCtx, mkEnv, norm)
-import Doxotry.Language.Grammar (Tm, Tm_(..), Ty(..), TyBase(..), generate, number, numberTy, prettyTm, ref, string, stringTy, (&), (&->), (&:), (&=>))
+import Doxotry.Language.Grammar (Tm, Tm_(..), Ty(..), TyBase(..), generate, lam, number, numberTy, prettyTm, rec, recTy, ref, string, stringTy, (&), (&->), (&=>))
 import Doxotry.Language.Typing as Typing
 import Doxotry.Utility (runIdentity)
-import Effect.Aff (Aff)
 import Effect.Exception (error)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -33,10 +31,10 @@ spec = describe "Execution" do
       (number 101.0)
       (number 101.0)
     it_norms true stringTy
-      (([ "x" &: stringTy ] &=> string "hello world") & [ string "ignore this" ])
+      (([ "x" /\ stringTy ] &=> string "hello world") & [ string "ignore this" ])
       (string "hello world")
     it_norms true stringTy
-      (([ "x" &: stringTy ] &=> ref "x") & [ string "hello world" ])
+      (([ "x" /\ stringTy ] &=> ref "x") & [ string "hello world" ])
       (string "hello world")
     it_norms true stringTy
       (generate & [ string "" ])
@@ -44,9 +42,15 @@ spec = describe "Execution" do
     it_norms true numberTy
       (generate & [ string "" ])
       (defaultTm numberTy # runIdentity)
-    it_norms true ([ "x" &: stringTy ] &-> numberTy)
+    it_norms true ([ "x" /\ stringTy ] &-> numberTy)
       (generate & [ string "" ])
-      (defaultTm (([ "x" &: stringTy ] &-> numberTy)) # runIdentity)
+      (defaultTm ([ "x" /\ stringTy ] &-> numberTy) # runIdentity)
+    it_norms true (recTy [ "x" /\ stringTy ])
+      (generate & [ string "" ])
+      (defaultTm (recTy [ "x" /\ stringTy ]) # runIdentity)
+    it_norms true (recTy [ "x" /\ stringTy ])
+      (rec [ "x" /\ ((lam "s" stringTy (ref "s")) & [ string "hello world" ]) ])
+      (rec [ "x" /\ string "hello world" ])
 
 it_norms
   :: Boolean
@@ -61,7 +65,7 @@ it_norms success ty tm tm_expected =
         # flip runReaderT (Typing.mkCtx {})
         # runExceptT
         # runWriterT
-        # (unwrap :: Identity _ -> _)
+        # runIdentity
         # case _ of
             Right tm' /\ _ -> pure tm'
             Left err /\ logs -> throwError $ error $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
@@ -90,6 +94,9 @@ generateImpl = Generate \args -> defaultTm args.ty
 defaultTm :: forall m. Monad m => Ty -> m (Tm ())
 defaultTm (BaseTy { base: NumberTyBase }) = pure $ number 0.0
 defaultTm (BaseTy { base: StringTyBase }) = pure $ string "hello world"
-defaultTm (ArrTy { prm, dom, cod }) = do
-  body <- defaultTm cod
-  pure $ LamTm { prm, dom, body } {}
+defaultTm (ArrTy ty) = do
+  body <- defaultTm ty.cod
+  pure $ LamTm { prm: ty.prm, dom: ty.dom, body } {}
+defaultTm (RecTy ty) = do
+  fields <- ty.fields # traverse defaultTm
+  pure $ RecTm { fields } {}
