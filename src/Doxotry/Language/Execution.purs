@@ -2,20 +2,22 @@ module Doxotry.Language.Execution where
 
 import Prelude
 
-import Data.Foldable (intercalate)
+import Control.Monad.Cont (class MonadCont)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader)
 import Control.Monad.State (class MonadState, modify)
 import Control.Monad.Writer (class MonadWriter)
+import Data.Foldable (intercalate)
 import Data.List (List, find)
 import Data.List as List
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (fst)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Unfoldable (none)
 import Doxotry.Language.Common (Log)
-import Doxotry.Language.Grammar (SemTm, SemTm_(..), Tm_(..), Ty(..), Var(..), getAnOfTm, prettyVar)
+import Doxotry.Language.Grammar (Prompt(..), SemTm, SemTm_(..), Tm_(..), Ty(..), Var(..), getAnOfTm, prettyTm, prettyVar)
 import Doxotry.Language.Typing (TypedAn, TypedTm)
 import Prim.Row (class Lacks)
 import Record as Record
@@ -37,11 +39,15 @@ mkCtx
   { defaultAn
   }
 
-type Env = { freshCounter :: Int }
+type Env =
+  { freshCounter :: Int
+  , generationCache :: Map.Map Prompt String
+  }
 
 mkEnv :: {} -> Env
 mkEnv {} =
   { freshCounter: 0
+  , generationCache: Map.empty
   }
 
 newtype Err = Err { message :: String }
@@ -68,6 +74,7 @@ reflect
   => MonadState Env m
   => MonadThrow Err m
   => MonadWriter (Array Log) m
+  => MonadCont m
   => Lacks "ty" an
   => TypedTm an
   -> TypedSemTm m an
@@ -92,6 +99,7 @@ reify
   => MonadState Env m
   => MonadThrow Err m
   => MonadWriter (Array Log) m
+  => MonadCont m
   => Lacks "ty" an
   => TypedSemTm m an
   -> m (TypedTm an)
@@ -107,9 +115,10 @@ reify (FunSemTm tm an) = do
             VarTm
               { var: prm }
               (an # Record.set (Proxy @"ty") ty.dom)
-
         )
   pure $ LamTm { prm, dom: ty.dom, body } an
+-- reify (SynSemTm (GenerateTm tm an)) = do
+--   ?a
 reify (SynSemTm tm) = pure tm
 
 --------------------------------------------------------------------------------
@@ -120,6 +129,7 @@ denote
   => MonadState Env m
   => MonadThrow Err m
   => MonadWriter (Array Log) m
+  => MonadCont m
   => Lacks "ty" an
   => Subst m an
   -> TypedTm an
@@ -133,7 +143,7 @@ denote sigma (LamTm tm an) = pure $ FunSemTm
 denote sigma (AppTm tm _) = do
   apl <- denote sigma tm.apl >>= case _ of
     FunSemTm apl _ -> pure apl
-    _ -> throwError $ Err { message: "TODO" }
+    SynSemTm apl -> throwError $ Err { message: "A non-function semantic term was used as an applicant: " <> prettyTm apl }
   apl.run =<< denote sigma tm.arg
 denote _ tm0 = pure $ SynSemTm tm0
 
@@ -145,6 +155,7 @@ norm
   => MonadState Env m
   => MonadThrow Err m
   => MonadWriter (Array Log) m
+  => MonadCont m
   => Lacks "ty" an
   => TypedTm an
   -> m (TypedTm an)

@@ -13,6 +13,7 @@ import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
 import Doxotry.Language.Common (Log, tellLog)
 import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, prettyTm, prettyTy, prettyTyCtx, prettyVar)
+import Doxotry.Language.Syntax (stringTy)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -125,10 +126,12 @@ typecheckTm ty tm0@(LamTm tm an) = do
 -- GenerateTm
 typecheckTm ty tm0@(GenerateTm tm an) = do
   log_typecheckTm ty tm0
+  prompt <- typecheckTm stringTy tm.prompt
   pure $
     GenerateTm
-      { prompt: tm.prompt }
+      { prompt }
       (Record.insert (Proxy @"ty") ty an)
+
 -- type error
 typecheckTm ty tm = do
   tellLog "typecheckTm" $ prettyTm tm <> " : " <> prettyTy ty

@@ -2,20 +2,23 @@ module Test.Doxotry.Language.Execution where
 
 import Prelude
 
+import Control.Monad.Cont (runContT)
 import Control.Monad.Except (runExceptT, throwError)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (evalStateT)
-import Control.Monad.Writer (runWriterT)
-import Data.Either (Either(..))
+import Control.Monad.Writer (WriterT, runWriterT)
+import Data.Either (Either(..), either)
 import Data.Foldable (intercalate)
 import Data.Identity (Identity)
 import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
-import Doxotry.Language.Common (prettyLog)
+import Doxotry.Language.Common (Log(..), prettyLog)
 import Doxotry.Language.Execution (mkCtx, mkEnv, norm)
 import Doxotry.Language.Grammar (Tm, Ty, prettyTm)
 import Doxotry.Language.Syntax (number, numberTy, ref, string, stringTy, (&), (&:), (&=>))
 import Doxotry.Language.Typing as Typing
+import Effect.Class (liftEffect)
+import Effect.Class.Console as Console
 import Effect.Exception (error)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -58,12 +61,18 @@ it_norms success ty tm tm_expected =
       # flip evalStateT (mkEnv {})
       # runExceptT
       # runWriterT
-      # (unwrap :: Identity _ -> _)
-      # case _ of
-          Right tm'' /\ logs
-            | success -> Typing.erase tm'' `shouldEqual` tm_expected
-            | otherwise -> throwError $ error $ "norms" <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
-          Left err /\ logs
-            | success -> throwError $ error $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
-            | otherwise -> pure unit
+      # flip runContT
+          ( \(ea /\ logs) -> map (_ /\ logs) $ ea # either (pure <<< throwError)
+              ( map pure <<< \x -> do
+                  liftEffect $ Console.log $ "hello, " <> prettyTm x
+                  pure x
+              )
+          )
+      >>= case _ of
+        Right tm'' /\ logs
+          | success -> Typing.erase tm'' `shouldEqual` tm_expected
+          | otherwise -> throwError $ error $ "norms" <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
+        Left err /\ logs
+          | success -> throwError $ error $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
+          | otherwise -> pure unit
 

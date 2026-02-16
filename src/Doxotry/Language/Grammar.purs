@@ -61,7 +61,7 @@ data Tm_ an
   | VarTm VarTm an
   | LamTm (LamTm_ an) an
   | AppTm (AppTm_ an) an
-  | GenerateTm GenerateTm an
+  | GenerateTm (GenerateTm_ an) an
 
 derive instance Generic (Tm_ an) _
 
@@ -82,7 +82,8 @@ type LamTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
-type GenerateTm = { prompt :: String }
+type GenerateTm an = GenerateTm_ (Record an)
+type GenerateTm_ an = { prompt :: Tm_ an }
 
 data TmLit
   = NumberTmLit Number
@@ -100,7 +101,7 @@ prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
 prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " :: " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
-prettyTm (GenerateTm tm _) = "(#generate " <> show tm.prompt <> ")"
+prettyTm (GenerateTm tm _) = "(#generate " <> prettyTm tm.prompt <> ")"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
@@ -164,4 +165,17 @@ newtype TyVar = TyVar String
 derive newtype instance Show TyVar
 
 derive newtype instance Eq TyVar
+
+--------------------------------------------------------------------------------
+
+newtype Prompt = Prompt
+  { content :: String
+  }
+
+derive newtype instance Show Prompt
+
+derive newtype instance Eq Prompt
+
+prettyPrompt :: Prompt -> String
+prettyPrompt (Prompt p) = p.content
 

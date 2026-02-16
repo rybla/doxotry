@@ -2,6 +2,7 @@ module Doxotry.Language.Syntax where
 
 import Data.Foldable (class Foldable, foldl, foldr)
 import Data.Maybe (Maybe(..))
+import Doxotry.Language.Grammar (Prompt(..))
 import Doxotry.Language.Grammar as G
 
 --------------------------------------------------------------------------------
@@ -51,7 +52,7 @@ lams prms body = foldr (\(Bind x) -> lam x.prm x.dom) body prms
 
 infixr 100 lams as &=>
 
-generate :: String -> G.Tm ()
+generate :: G.Tm () -> G.Tm ()
 generate prompt = G.GenerateTm { prompt } {}
 
 var :: String -> G.Var

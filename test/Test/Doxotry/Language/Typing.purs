@@ -49,10 +49,10 @@ spec = describe "Typing" do
       )
     it_typechecks true
       stringTy
-      (generate "What is the capital of Paris?")
+      (generate (string "What is the capital of Paris?"))
     it_typechecks true
       numberTy
-      (generate "What is 1 + 2?")
+      (generate (string "What is 1 + 2?"))
 
 it_typechecks
   :: forall an
@@ -68,7 +68,6 @@ it_typechecks success ty tm =
       # flip runReaderT (mkCtx {})
       # runExceptT
       # runWriterT
-      # (unwrap :: Identity _ -> _)
-      # case _ of
-          (Right _ /\ logs) -> unless success do fail $ "well-typed" <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
-          (Left err /\ logs) -> when success do fail $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
+      >>= case _ of
+        (Right _ /\ logs) -> unless success do fail $ "well-typed" <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
+        (Left err /\ logs) -> when success do fail $ show err <> "\n\n" <> "logs:\n" <> (logs # map prettyLog # intercalate "\n")
