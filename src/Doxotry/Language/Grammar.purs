@@ -61,7 +61,7 @@ data Tm_ an
   | VarTm VarTm an
   | LamTm (LamTm_ an) an
   | AppTm (AppTm_ an) an
-  | InputTm InputTm an
+  | GenerateTm GenerateTm an
 
 derive instance Generic (Tm_ an) _
 
@@ -82,7 +82,7 @@ type LamTm_ an = { prm :: Var, dom :: Ty, body :: Tm_ an }
 type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
-type InputTm = { prompt :: String }
+type GenerateTm = { prompt :: String }
 
 data TmLit
   = NumberTmLit Number
@@ -100,7 +100,7 @@ prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
 prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " :: " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
-prettyTm (InputTm tm _) = "(#input " <> show tm.prompt <> ")"
+prettyTm (GenerateTm tm _) = "(#generate " <> show tm.prompt <> ")"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
@@ -111,14 +111,14 @@ getAnOfTm (LitTm _ an) = an
 getAnOfTm (VarTm _ an) = an
 getAnOfTm (AppTm _ an) = an
 getAnOfTm (LamTm _ an) = an
-getAnOfTm (InputTm _ an) = an
+getAnOfTm (GenerateTm _ an) = an
 
 modifySurfaceAnOfTm :: forall an. (an -> an) -> Tm_ an -> Tm_ an
 modifySurfaceAnOfTm f (LitTm tm an) = LitTm tm (f an)
 modifySurfaceAnOfTm f (VarTm tm an) = VarTm tm (f an)
 modifySurfaceAnOfTm f (AppTm tm an) = AppTm tm (f an)
 modifySurfaceAnOfTm f (LamTm tm an) = LamTm tm (f an)
-modifySurfaceAnOfTm f (InputTm tm an) = InputTm tm (f an)
+modifySurfaceAnOfTm f (GenerateTm tm an) = GenerateTm tm (f an)
 
 --------------------------------------------------------------------------------
 

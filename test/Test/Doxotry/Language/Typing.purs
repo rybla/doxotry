@@ -12,7 +12,7 @@ import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
 import Doxotry.Language.Grammar (Tm_, Ty, prettyTm, prettyTy)
-import Doxotry.Language.Syntax (number, numberTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
+import Doxotry.Language.Syntax (generate, number, numberTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
 import Doxotry.Language.Typing (typecheckTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
@@ -47,6 +47,12 @@ spec = describe "Typing" do
       ( ([ "x" &: stringTy, "y" &: stringTy ] &=> ref "x") &
           [ string "hello", string "world" ]
       )
+    it_typechecks true
+      stringTy
+      (generate "What is the capital of Paris?")
+    it_typechecks true
+      numberTy
+      (generate "What is 1 + 2?")
 
 it_typechecks
   :: forall an

@@ -51,8 +51,8 @@ lams prms body = foldr (\(Bind x) -> lam x.prm x.dom) body prms
 
 infixr 100 lams as &=>
 
-input :: String -> G.Tm ()
-input prompt = G.InputTm { prompt } {}
+generate :: String -> G.Tm ()
+generate prompt = G.GenerateTm { prompt } {}
 
 var :: String -> G.Var
 var name = G.Var { name, mb_index: Nothing }

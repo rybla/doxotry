@@ -101,7 +101,6 @@ typecheckTm ty tm0@(AppTm tm an) = do
     , arg: arg'
     }
     (Record.insert (Proxy @"ty") ty an)
-
 -- LamTm
 typecheckTm ty tm0@(LamTm tm an) = do
   log_typecheckTm ty tm0
@@ -123,11 +122,11 @@ typecheckTm ty tm0@(LamTm tm an) = do
     LamTm
       { prm: tm.prm, dom: tm.dom, body: b }
       (Record.insert (Proxy @"ty") ty an)
--- InputTm
-typecheckTm ty tm0@(InputTm tm an) = do
+-- GenerateTm
+typecheckTm ty tm0@(GenerateTm tm an) = do
   log_typecheckTm ty tm0
   pure $
-    InputTm
+    GenerateTm
       { prompt: tm.prompt }
       (Record.insert (Proxy @"ty") ty an)
 -- type error
