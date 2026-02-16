@@ -2,11 +2,12 @@ module Doxotry.Language.Execution where
 
 import Prelude
 
-import Control.Monad.Cont (class MonadCont)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Control.Monad.Reader (class MonadReader)
+import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Reader (class MonadReader, ask, runReaderT)
 import Control.Monad.State (class MonadState, modify)
 import Control.Monad.Writer (class MonadWriter)
+import Data.Either (either)
 import Data.Foldable (intercalate)
 import Data.List (List, find)
 import Data.List as List
@@ -17,8 +18,11 @@ import Data.Tuple (fst)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Unfoldable (none)
 import Doxotry.Language.Common (Log)
-import Doxotry.Language.Grammar (Prompt(..), SemTm, SemTm_(..), Tm_(..), Ty(..), Var(..), getAnOfTm, prettyTm, prettyVar)
-import Doxotry.Language.Typing (TypedAn, TypedTm)
+import Doxotry.Language.Grammar (SemTm, SemTm_(..), TmLit(..), Tm_(..), Ty(..), Var(..), Tm, getAnOfTm, prettySemTm, prettyTm, prettyTy, prettyVar, var)
+import Doxotry.Language.Typing (TypedAn, TypedTm, erase)
+import Doxotry.Language.Typing as Typing
+import Effect.Aff (Aff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -26,22 +30,35 @@ import Type.Proxy (Proxy(..))
 --------------------------------------------------------------------------------
 
 type Ctx an = Ctx_ (Record an)
-type Ctx_ an = { defaultAn :: an }
+type Ctx_ an =
+  { defaultAn :: an
+  , generate :: GenerateType
+  }
+
+type GenerateType = Prompt -> ExceptT String Aff (Tm ())
+
+type Prompt =
+  { ty :: Ty
+  , user :: String
+  }
 
 mkCtx
   :: forall an
    . { defaultAn :: an
+     , generate :: GenerateType
      }
   -> Ctx_ an
 mkCtx
   { defaultAn
+  , generate
   } =
   { defaultAn
+  , generate
   }
 
 type Env =
   { freshCounter :: Int
-  , generationCache :: Map.Map Prompt String
+  , generationCache :: Map.Map String String
   }
 
 mkEnv :: {} -> Env
@@ -50,9 +67,13 @@ mkEnv {} =
   , generationCache: Map.empty
   }
 
-newtype Err = Err { message :: String }
+type Err an = Err_ (Record an)
+newtype Err_ an = Err
+  { message :: String
+  , subject :: Maybe (Tm_ an)
+  }
 
-instance Show Err where
+instance Show an => Show (Err_ an) where
   show (Err err) = "Execution error: " <> err.message
 
 --------------------------------------------------------------------------------
@@ -61,9 +82,9 @@ type TypedSemTm m an = SemTm m (TypedAn an)
 
 type Subst m an = List (Var /\ TypedSemTm m an)
 
-getSubst :: forall m an. MonadThrow Err m => Var -> Subst m an -> m (TypedSemTm m an)
+getSubst :: forall m an. MonadThrow (Err an) m => Var -> Subst m an -> m (TypedSemTm m an)
 getSubst x sigma = case sigma # find (\(x' /\ _) -> x == x') of
-  Nothing -> throwError $ Err { message: "Unrecognized variable " <> prettyVar x <> " in substitution of variables " <> "[" <> (sigma # map (fst >>> prettyVar) # intercalate ", ") <> "]" }
+  Nothing -> throwError $ Err { message: "Unrecognized variable " <> prettyVar x <> " in substitution of variables " <> "[" <> (sigma # map (fst >>> prettyVar) # intercalate ", ") <> "]", subject: none }
   Just (_ /\ a) -> pure a
 
 --------------------------------------------------------------------------------
@@ -72,14 +93,14 @@ reflect
   :: forall m an
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => MonadWriter (Array Log) m
-  => MonadCont m
+  => MonadAff m
   => Lacks "ty" an
   => TypedTm an
   -> TypedSemTm m an
-reflect tm | FunTy ty <- (tm # getAnOfTm).ty = do
-  FunSemTm
+reflect tm | ArrTy ty <- (tm # getAnOfTm).ty = do
+  LamSemTm
     { prm: ty.prm
     , run: \prm -> do
         arg <- reify prm
@@ -97,28 +118,24 @@ reify
   :: forall m an
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => MonadWriter (Array Log) m
-  => MonadCont m
+  => MonadAff m
   => Lacks "ty" an
   => TypedSemTm m an
   -> m (TypedTm an)
-reify (FunSemTm tm an) = do
+reify (LamSemTm tm an) = do
   ty <- case an.ty of
-    FunTy ty -> pure ty
-    ty -> throwError $ Err { message: "cannot reify semantic term since it was reflected as a function term but it is annotated with the non-function type " <> show ty }
+    ArrTy ty -> pure ty
+    ty -> throwError $ Err { message: "Cannot reify semantic term since it was reflected as a semantic function term but it is annotated with the non-function type " <> show ty, subject: none }
   prm <- fresh (tm.prm # unwrap).name
-  body <-
-    reify =<<
-      tm.run
-        ( reflect $
-            VarTm
-              { var: prm }
-              (an # Record.set (Proxy @"ty") ty.dom)
-        )
+  let
+    arg = reflect $
+      VarTm
+        { var: prm }
+        (an # Record.set (Proxy @"ty") ty.dom)
+  body <- reify =<< tm.run arg
   pure $ LamTm { prm, dom: ty.dom, body } an
--- reify (SynSemTm (GenerateTm tm an)) = do
---   ?a
 reify (SynSemTm tm) = pure tm
 
 --------------------------------------------------------------------------------
@@ -127,24 +144,49 @@ denote
   :: forall m an
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => MonadWriter (Array Log) m
-  => MonadCont m
+  => MonadAff m
   => Lacks "ty" an
   => Subst m an
   -> TypedTm an
   -> m (TypedSemTm m an)
 denote sigma (VarTm tm _) = sigma # getSubst tm.var
-denote sigma (LamTm tm an) = pure $ FunSemTm
+denote sigma (LamTm tm an) = pure $ LamSemTm
   { prm: tm.prm
-  , run: \a -> denote (sigma # List.Cons (tm.prm /\ a)) tm.body
+  , run: \arg -> denote (sigma # List.Cons (tm.prm /\ arg)) tm.body
   }
   an
 denote sigma (AppTm tm _) = do
   apl <- denote sigma tm.apl >>= case _ of
-    FunSemTm apl _ -> pure apl
-    SynSemTm apl -> throwError $ Err { message: "A non-function semantic term was used as an applicant: " <> prettyTm apl }
+    LamSemTm apl _ -> pure apl
+    apl -> throwError $ Err { message: "A non-function semantic term was used as an applicant: " <> prettySemTm apl, subject: none }
   apl.run =<< denote sigma tm.arg
+denote _sigma tm0@(GenerateTm _tm an) = pure $ LamSemTm
+  { prm: var "prompt"
+  , run: \prompt -> reify prompt >>= case _ of
+      LitTm { lit: StringTmLit promptString } _an_prompt -> do
+        ctx <- ask
+        arr <- case an.ty of
+          ArrTy arr -> pure arr
+          ty -> throwError $ Err { message: "The term " <> prettyTm tm0 <> " must have a function type, but it was annotated with type " <> prettyTy ty, subject: pure $ erase tm0 }
+        result <-
+          ctx.generate
+            { ty: arr.cod
+            , user: promptString
+            }
+            # runExceptT
+            # liftAff
+            >>= either (\err -> throwError $ Err { message: "Error when evaluating term " <> prettyTm tm0 <> ": " <> err, subject: pure $ erase tm0 }) pure
+            <#> map (const ctx.defaultAn)
+        result' <- Typing.typecheckTm arr.cod result
+          # runExceptT
+          # flip runReaderT (Typing.mkCtx {})
+          >>= either (\(Typing.Err err) -> throwError $ Err { message: "Error when typechecking generated term: " <> err.message, subject: pure result }) pure
+        pure $ SynSemTm $ result'
+      prompt' -> throwError $ Err { message: "Cannot run generate with this term as a prompt: " <> prettyTm prompt', subject: pure $ erase tm0 }
+  }
+  an
 denote _ tm0 = pure $ SynSemTm tm0
 
 --------------------------------------------------------------------------------
@@ -153,9 +195,9 @@ norm
   :: forall an m
    . MonadReader (Ctx an) m
   => MonadState Env m
-  => MonadThrow Err m
+  => MonadThrow (Err an) m
   => MonadWriter (Array Log) m
-  => MonadCont m
+  => MonadAff m
   => Lacks "ty" an
   => TypedTm an
   -> m (TypedTm an)

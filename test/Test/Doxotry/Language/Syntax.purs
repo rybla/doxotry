@@ -2,7 +2,7 @@ module Test.Doxotry.Language.Syntax where
 
 import Prelude
 
-import Doxotry.Language.Syntax (ref, stringTy, (&), (&->), (&:), (&=>))
+import Doxotry.Language.Grammar (ref, stringTy, (&), (&->), (&:), (&=>))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 

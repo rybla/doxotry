@@ -3,23 +3,24 @@ module Doxotry.Language.Grammar where
 import Prelude
 
 import Data.Eq.Generic (genericEq)
-import Data.Foldable (intercalate)
+import Data.Foldable (class Foldable, foldl, foldr, intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
 import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Tuple.Nested (type (/\), (/\))
+import Data.Unfoldable (none)
 
 --------------------------------------------------------------------------------
 
 data Ty
   = BaseTy BaseTy
-  | FunTy FunTy
+  | ArrTy ArrTy
 
 type BaseTy = { base :: TyBase }
 
-type FunTy = { prm :: Var, dom :: Ty, cod :: Ty }
+type ArrTy = { prm :: Var, dom :: Ty, cod :: Ty }
 
 derive instance Generic Ty _
 
@@ -42,7 +43,7 @@ derive instance Eq TyBase
 
 prettyTy :: Ty -> String
 prettyTy (BaseTy bt) = showTyBase bt.base
-prettyTy (FunTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> " -> " <> prettyTy ty.cod <> ")"
+prettyTy (ArrTy ty) = "(" <> prettyVar ty.prm <> " : " <> prettyTy ty.dom <> " -> " <> prettyTy ty.cod <> ")"
 
 showTyBase :: TyBase -> String
 showTyBase NumberTyBase = "Number"
@@ -83,7 +84,9 @@ type AppTm an = AppTm_ (Record an)
 type AppTm_ an = { apl :: Tm_ an, arg :: Tm_ an }
 
 type GenerateTm an = GenerateTm_ (Record an)
-type GenerateTm_ an = { prompt :: Tm_ an }
+
+type GenerateTm_ :: Type -> Type
+type GenerateTm_ an = {}
 
 data TmLit
   = NumberTmLit Number
@@ -101,7 +104,7 @@ prettyTm (LitTm tm _) = prettyLit tm.lit
 prettyTm (VarTm tm _) = prettyVar tm.var
 prettyTm (AppTm tm _) = "(" <> prettyTm tm.apl <> " " <> prettyTm tm.arg <> ")"
 prettyTm (LamTm tm _) = "(" <> prettyVar tm.prm <> " :: " <> prettyTy tm.dom <> " => " <> prettyTm tm.body <> ")"
-prettyTm (GenerateTm tm _) = "(#generate " <> prettyTm tm.prompt <> ")"
+prettyTm (GenerateTm _tm _) = "#generate"
 
 prettyLit :: TmLit -> String
 prettyLit (NumberTmLit v) = show v
@@ -113,6 +116,11 @@ getAnOfTm (VarTm _ an) = an
 getAnOfTm (AppTm _ an) = an
 getAnOfTm (LamTm _ an) = an
 getAnOfTm (GenerateTm _ an) = an
+
+getDomOfTm :: forall an. Tm_ an -> Maybe { prm :: Var, dom :: Ty }
+getDomOfTm (LamTm tm _) = pure { prm: tm.prm, dom: tm.dom }
+getDomOfTm (GenerateTm _ _) = pure { prm: var "prompt", dom: stringTy }
+getDomOfTm _ = none
 
 modifySurfaceAnOfTm :: forall an. (an -> an) -> Tm_ an -> Tm_ an
 modifySurfaceAnOfTm f (LitTm tm an) = LitTm tm (f an)
@@ -127,13 +135,21 @@ type SemTm m an = SemTm_ m (Record an)
 
 data SemTm_ m an
   = SynSemTm (Tm_ an)
-  | FunSemTm (FunSemTm m an) an
+  | LamSemTm (LamSemTm_ m an) an
 
-type FunSemTm m an = { prm :: Var, run :: SemTm_ m an -> m (SemTm_ m an) }
+type LamSemTm m an = LamSemTm_ m (Record an)
+type LamSemTm_ m an = { prm :: Var, run :: SemTm_ m an -> m (SemTm_ m an) }
+
+type GenerateSemTm m an = GenerateSemTm_ m (Record an)
+type GenerateSemTm_ m an = { run :: m (SemTm_ m an) }
+
+prettySemTm :: forall m an. SemTm m an -> String
+prettySemTm (SynSemTm tm) = prettyTm tm
+prettySemTm (LamSemTm tm _an) = "(" <> prettyVar tm.prm <> " => " <> "..." <> ")"
 
 getAnOfSemTm :: forall m an. SemTm_ m an -> an
 getAnOfSemTm (SynSemTm tm) = getAnOfTm tm
-getAnOfSemTm (FunSemTm _ an) = an
+getAnOfSemTm (LamSemTm _ an) = an
 
 --------------------------------------------------------------------------------
 
@@ -167,15 +183,66 @@ derive newtype instance Show TyVar
 derive newtype instance Eq TyVar
 
 --------------------------------------------------------------------------------
+-- Syntax for Types 
+--------------------------------------------------------------------------------
 
-newtype Prompt = Prompt
-  { content :: String
-  }
+stringTy :: Ty
+stringTy = BaseTy { base: StringTyBase }
 
-derive newtype instance Show Prompt
+numberTy :: Ty
+numberTy = BaseTy { base: NumberTyBase }
 
-derive newtype instance Eq Prompt
+arrTy :: String -> Ty -> Ty -> Ty
+arrTy x dom cod = ArrTy { prm: var x, dom, cod }
 
-prettyPrompt :: Prompt -> String
-prettyPrompt (Prompt p) = p.content
+arrsTy :: forall f. Foldable f => f Bind -> Ty -> Ty
+arrsTy xs cod = foldr (\(Bind x) -> arrTy x.prm x.dom) cod xs
+
+infixr 100 arrsTy as &->
+
+--------------------------------------------------------------------------------
+-- Syntax for Terms
+--------------------------------------------------------------------------------
+
+number :: Number -> Tm ()
+number v = LitTm { lit: NumberTmLit v } {}
+
+string :: String -> Tm ()
+string v = LitTm { lit: StringTmLit v } {}
+
+ref :: String -> Tm ()
+ref name = VarTm { var: Var { name, mb_index: none } } {}
+
+app :: Tm () -> Tm () -> Tm ()
+app apl arg = AppTm { apl, arg } {}
+
+apps :: forall f. Foldable f => Tm () -> f (Tm ()) -> Tm ()
+apps f args = foldl app f args
+
+infixl 110 apps as &
+
+lam :: String -> Ty -> Tm () -> Tm ()
+lam prm dom body = LamTm { prm: var prm, dom, body } {}
+
+lams :: forall f. Foldable f => f Bind -> Tm () -> Tm ()
+lams prms body = foldr (\(Bind x) -> lam x.prm x.dom) body prms
+
+infixr 100 lams as &=>
+
+generate :: Tm ()
+generate = GenerateTm {} {}
+
+var :: String -> Var
+var name = Var { name, mb_index: none }
+
+--------------------------------------------------------------------------------
+--  Syntax Utilities
+--------------------------------------------------------------------------------
+
+newtype Bind = Bind { prm :: String, dom :: Ty }
+
+mkBind :: String -> Ty -> Bind
+mkBind prm dom = Bind { prm: prm, dom }
+
+infix 101 mkBind as &:
 

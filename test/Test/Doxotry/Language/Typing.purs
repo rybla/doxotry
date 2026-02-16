@@ -7,12 +7,9 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Writer (runWriterT)
 import Data.Either (Either(..))
 import Data.Foldable (intercalate)
-import Data.Identity (Identity)
-import Data.Newtype (unwrap)
 import Data.Tuple.Nested ((/\))
 import Doxotry.Language.Common (prettyLog)
-import Doxotry.Language.Grammar (Tm_, Ty, prettyTm, prettyTy)
-import Doxotry.Language.Syntax (generate, number, numberTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
+import Doxotry.Language.Grammar (Tm_, Ty, generate, number, numberTy, prettyTm, prettyTy, ref, string, stringTy, (&), (&->), (&:), (&=>))
 import Doxotry.Language.Typing (typecheckTm, mkCtx)
 import Prim.Row (class Lacks)
 import Test.Spec (Spec, describe, it)
@@ -49,10 +46,10 @@ spec = describe "Typing" do
       )
     it_typechecks true
       stringTy
-      (generate (string "What is the capital of Paris?"))
+      (generate & [ string "What is the capital of Paris?" ])
     it_typechecks true
       numberTy
-      (generate (string "What is 1 + 2?"))
+      (generate & [ string "What is 1 + 2?" ])
 
 it_typechecks
   :: forall an

@@ -2,6 +2,7 @@ module Doxotry.Language.Typing where
 
 import Prelude
 
+import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, getDomOfTm, prettyTm, prettyTy, prettyTyCtx, prettyVar, stringTy)
 import Control.Alternative (guard)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Control.Monad.Reader (class MonadReader, ask, local)
@@ -12,8 +13,6 @@ import Data.Newtype (over, unwrap)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (none)
 import Doxotry.Language.Common (Log, tellLog)
-import Doxotry.Language.Grammar (Tm, TmLit(..), Tm_(..), Ty(..), TyBase(..), TyCtx(..), Var, prettyTm, prettyTy, prettyTyCtx, prettyVar)
-import Doxotry.Language.Syntax (stringTy)
 import Prim.Row (class Lacks)
 import Record as Record
 import Type.Proxy (Proxy(..))
@@ -60,7 +59,6 @@ typecheckTm
   => MonadThrow (Err an) m
   => MonadWriter (Array Log) m
   => Lacks "ty" an
-  => Show (Record an)
   => Ty
   -> Tm an
   -> m (TypedTm an)
@@ -76,49 +74,30 @@ typecheckTm ty tm0@(VarTm tm an) = do
   log_typecheckTm ty tm0
   ty' <- getTypeOfVar tm.var an
   unless (ty == ty') do
-    throwError $ Err
-      { message: "var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty'
-      , subject: tm0
-      }
+    throwError $ Err { message: "The var " <> prettyTm tm0 <> " was expected to have type " <> prettyTy ty <> ", but it actually has type " <> prettyTy ty', subject: tm0 }
   pure $ VarTm { var: tm.var } (Record.insert (Proxy @"ty") ty an)
 -- AppTm
 typecheckTm ty tm0@(AppTm tm an) = do
   log_typecheckTm ty tm0
-  f <- case tm.apl of
-    LamTm f _ -> pure f
-    f -> throwError $ Err
-      { message: "the applicant of an application must be a function term, but it actually was " <> prettyTm f
-      , subject: tm0
-      }
-  arg' <- typecheckTm f.dom tm.arg
-  b <-
-    extendTyCtx f.prm f.dom do
-      typecheckTm ty f.body
+  arr <- getDomOfTm tm.apl # flip maybe pure (throwError $ Err { message: "The applicant of an application must have a function type, but it's actually " <> prettyTm tm.apl, subject: tm0 })
+  apl' <- typecheckTm (ArrTy { prm: arr.prm, dom: arr.dom, cod: ty }) tm.apl
+  arg' <- typecheckTm arr.dom tm.arg
   pure $ AppTm
-    { apl:
-        LamTm
-          { prm: f.prm, dom: f.dom, body: b }
-          (Record.insert (Proxy @"ty") (FunTy { prm: f.prm, dom: f.dom, cod: ty }) an)
+    { apl: apl'
     , arg: arg'
     }
     (Record.insert (Proxy @"ty") ty an)
 -- LamTm
 typecheckTm ty tm0@(LamTm tm an) = do
   log_typecheckTm ty tm0
-  phi <- case ty of
-    FunTy phi -> pure phi
-    _ -> throwError $ Err
-      { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term"
-      , subject: tm0
-      }
-  unless (phi.dom == tm.dom) do
-    throwError $ Err
-      { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy phi.dom <> ", but it actually had domain " <> prettyTy tm.dom
-      , subject: tm0
-      }
+  arr <- case ty of
+    ArrTy arr -> pure arr
+    _ -> throwError $ Err { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term", subject: tm0 }
+  unless (arr.dom == tm.dom) do
+    throwError $ Err { message: "The term " <> prettyTm tm0 <> " was expected to be a function term with domain " <> prettyTy arr.dom <> ", but it actually had domain " <> prettyTy tm.dom, subject: tm0 }
   b <-
     extendTyCtx tm.prm tm.dom do
-      typecheckTm phi.cod tm.body
+      typecheckTm arr.cod tm.body
   pure $
     LamTm
       { prm: tm.prm, dom: tm.dom, body: b }
@@ -126,19 +105,19 @@ typecheckTm ty tm0@(LamTm tm an) = do
 -- GenerateTm
 typecheckTm ty tm0@(GenerateTm tm an) = do
   log_typecheckTm ty tm0
-  prompt <- typecheckTm stringTy tm.prompt
+  arr <- case ty of
+    ArrTy arr -> pure arr
+    _ -> throwError $ Err { message: "The term " <> prettyTm tm0 <> " was expected to have a non-function type " <> prettyTy ty <> ", but it is actually a function term", subject: tm0 }
+  unless (arr.dom == stringTy) do
+    throwError $ Err { message: "The term " <> prettyTm tm0 <> " was expected to have a function type with domain " <> prettyTy arr.dom <> ", but it actually had domain " <> prettyTy stringTy, subject: tm0 }
   pure $
     GenerateTm
-      { prompt }
+      tm
       (Record.insert (Proxy @"ty") ty an)
-
 -- type error
 typecheckTm ty tm = do
   tellLog "typecheckTm" $ prettyTm tm <> " : " <> prettyTy ty
-  throwError $ Err
-    { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type."
-    , subject: tm
-    }
+  throwError $ Err { message: "The term " <> prettyTm tm <> " was expected to have type " <> prettyTy ty <> ", but it can't have that type.", subject: tm }
 
 log_typecheckTm
   :: forall m an
@@ -166,10 +145,4 @@ getTypeOfVar x an = do
             guard $ x == x'
             pure ty
         )
-    # maybe
-        ( throwError $ Err
-            { message: "Unrecognized variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx
-            , subject: VarTm { var: x } an
-            }
-        )
-        pure
+    # flip maybe pure (throwError $ Err { message: "Unrecognized variable " <> prettyVar x <> " in context " <> prettyTyCtx ctx.tyCtx, subject: VarTm { var: x } an })

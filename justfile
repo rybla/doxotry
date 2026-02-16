@@ -9,6 +9,9 @@ clean_javascript:
 clean_purescript:
     rm -rf .spago output
 
+clean_build:
+    rm -rf output/Doxotry.*
+
 clean_client:
     rm -rf client
 
